@@ -25,7 +25,7 @@ public class TestDrive extends LinearOpMode {
         LBmotor = hardwareMap.get(DcMotor.class, "LBmotor");
         RBmotor = hardwareMap.get(DcMotor.class, "RBmotor");
 
-        //imu = hardwareMap.get(IMU.class, "imu");
+        imu = hardwareMap.get(IMU.class, "imu");
         robotCentric = true;
 
         RFmotor.setDirection(DcMotor.Direction.FORWARD);
