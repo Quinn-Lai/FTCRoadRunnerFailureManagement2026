@@ -11,9 +11,10 @@ import org.firstinspires.ftc.teamcode.ClassData.RobotData;
 public class DriverControlMK2OpMode extends OpMode {
 
     //Data Classes
-    private RobotData robotData = new RobotData(hardwareMap, telemetry);       //Basic Robot Mechanics
     //private RoadRunnerData rrData = new RoadRunnerData(robotData);  //Road Runner Implementation
-    private AprilTagVision atVision = new AprilTagVision(hardwareMap,telemetry);
+    private final AprilTagVision atVision = new AprilTagVision(hardwareMap,telemetry);
+    private final RobotData robotData = new RobotData(hardwareMap, telemetry, atVision);       //Basic Robot Mechanics
+
 
     //Runs Once on Init
     @Override
@@ -26,6 +27,7 @@ public class DriverControlMK2OpMode extends OpMode {
     public void init_loop(){
         telemetry.addLine("Waiting for Round to Start");
         atVision.telemetryAprilTag();
+        robotData.getTurret().telemetryArm(10);
         telemetry.update();
     }
 

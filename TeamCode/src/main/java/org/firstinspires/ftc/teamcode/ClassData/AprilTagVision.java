@@ -55,10 +55,12 @@ public class AprilTagVision {
     private VisionPortal visionPortal;
     private HardwareMap hardwareMap;
     private Telemetry telemetry;
+    private double atHeight; //Meters
 
     public AprilTagVision(HardwareMap hardwareMap, Telemetry telemetry){
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
+        this.atHeight = 10; //Guess IDK
     }
 
     public void initAprilTag() {
@@ -158,6 +160,31 @@ public class AprilTagVision {
         telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
         telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
         telemetry.addLine("RBE = Range, Bearing & Elevation");
+
+    }
+
+    public double getDisp(){
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        double disp = 0;
+        double range = 0;
+
+        for (AprilTagDetection detection : currentDetections) {
+
+            if (detection.equals("e")){
+                range = detection.ftcPose.range;
+
+                //range^2 = height of apriltag^2 + xHorizontal^2
+
+                disp = Math.sqrt(Math.pow(range,2) - atHeight);
+
+                break;
+            }
+
+
+        }
+
+        return disp;
 
     }
 

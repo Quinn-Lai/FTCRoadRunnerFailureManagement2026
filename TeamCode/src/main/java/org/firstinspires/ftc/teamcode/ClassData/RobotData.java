@@ -56,8 +56,15 @@ public class RobotData{
     private boolean openCVEnabled;
     private static ColorRange startColor;
 
+    //April Tags
+    private AprilTagVision atData;
+
+    //Turret
+    private CalculateAim turret;
+
+
     //Constructor
-    public RobotData(HardwareMap hardwareMap, Telemetry telemetry){
+    public RobotData(HardwareMap hardwareMap, Telemetry telemetry, AprilTagVision atData){
 
         //Get Hardware Map
 
@@ -90,7 +97,8 @@ public class RobotData{
         //startColor = ColorRange.RED; //Default in Case Auto Wasn't Run First
 
         //Turret
-        CalculateAim turret = new CalculateAim();
+        turret = new CalculateAim();
+        this.atData = atData;
         this.telemetry = telemetry;
 
         if (!robotCentric){
@@ -302,6 +310,14 @@ public class RobotData{
         }
     }
 
+
+
+    //Turret
+
+    public CalculateAim getTurret(){
+        return turret;
+    }
+
 //    private double convertServo(double angle, double lateralDegree,double servoAngle, double referenceDegree){
 //        //x = desired angle in degrees
 //        //y = servoAngle
@@ -374,11 +390,11 @@ public class RobotData{
         }
     }
 
-    private class CalculateAim extends PIDControl{
+    public class CalculateAim extends PIDControl{
 
         //Motors
-        private DcMotorEx leftSpinnerMotor;
-        private DcMotorEx rightSpinnerMotor;
+        public DcMotorEx leftSpinnerMotor;
+        public DcMotorEx rightSpinnerMotor;
 
         //Physics Params
         private final double a = -9.8; //Acceleration m/s^2
@@ -393,8 +409,8 @@ public class RobotData{
 
         private CalculateAim(){
 
-            leftSpinnerMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"leftShooterMotor");
-            rightSpinnerMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"rightShooterMotor");
+            leftSpinnerMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"leftSpinnerMotor");
+            rightSpinnerMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"rightSpinnerMotor");
 
             leftSpinnerMotor.setDirection(DcMotor.Direction.FORWARD);
             rightSpinnerMotor.setDirection(DcMotor.Direction.REVERSE); //Guess
@@ -461,12 +477,6 @@ public class RobotData{
 
         //Shooter Actions
 
-        private void angleRobot(){
-
-            double desiredAngle = getAngleTotal();
-
-        }
-
         public void powerShooterMotors(double TPS){
 
             double leftCurrent = leftSpinnerMotor.getVelocity();
@@ -476,13 +486,39 @@ public class RobotData{
             rightSpinnerMotor.setVelocity(PIDRightSpinner(rightCurrent,TPS));
         }
 
-        public void aimBall(double disp){
+        private double convertDegToServo(double angle){
 
-            angleRobot();
+            double servoAngle = 0;
 
+            double convertedAngle = 0.00506667 * servoAngle +0.1; //Place Holder
+
+            return convertedAngle;
+        }
+
+        private void angleRobot(double angle){
+
+            double desiredAngle = getAngleTotal();
+
+            //Servo Movement
+
+            //servo.setPosition(convertDegToServo(desiredAngle));
+
+        }
+
+        public void aimBall(double disp, double angle){
+
+            angleRobot(angle);
             double TPS = getTPS(disp);
             powerShooterMotors(TPS);
 
+        }
+
+        public void telemetryArm(double disp){
+            telemetry.addData("vY: ", getVy());
+            telemetry.addData("vX: ",getVx(disp));
+            telemetry.addData("Velocity: ", getVelocityTotal(disp));
+            telemetry.addData("Angle: " , getAngleTotal());
+            telemetry.addData("Ticks Per Second: ", getTPS(disp));
         }
 
     }
