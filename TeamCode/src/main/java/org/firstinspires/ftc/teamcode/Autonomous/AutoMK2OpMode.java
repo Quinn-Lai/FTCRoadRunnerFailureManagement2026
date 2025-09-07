@@ -6,7 +6,9 @@ import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.robot.Robot;
 
+import org.firstinspires.ftc.teamcode.ClassData.AprilTagVision;
 import org.firstinspires.ftc.teamcode.ClassData.OpenCVData;
 import org.firstinspires.ftc.teamcode.ClassData.RoadRunnerData;
 import org.firstinspires.ftc.teamcode.ClassData.RobotData;
@@ -16,19 +18,27 @@ import org.firstinspires.ftc.vision.opencv.ColorRange;
 public class AutoMK2OpMode extends OpMode {
 
     //Data Classes
-    private RobotData robotData = new RobotData(hardwareMap);       //Basic Robot Mechanics
+    private RobotData robotData = new RobotData(hardwareMap, telemetry);       //Basic Robot Mechanics
     private RoadRunnerData rrData = new RoadRunnerData(robotData);  //Road Runner Implementation
-    private OpenCVData openCVData = new OpenCVData(hardwareMap);
+    private AprilTagVision atVision = new AprilTagVision(hardwareMap, telemetry);
+    //private OpenCVData openCVData = new OpenCVData(hardwareMap);
 
     @Override
-    public void init(){}
+    public void init(){
+
+        atVision.initAprilTag();
+    }
 
     @Override
     public void init_loop(){
 
         //Color Selection & OpenCV
 
-        if (robotData.isPendingColor() && robotData.getOpenCVEnabled()){
+        if (!(robotData.getOpenCVEnabled()) & robotData.isPendingColor()){
+            robotData.selectedColor();
+        }
+
+        else if (robotData.isPendingColor() && robotData.getOpenCVEnabled()){
             telemetry.addLine("Select Starting Team Color");
             telemetry.update();
 
@@ -37,8 +47,8 @@ public class AutoMK2OpMode extends OpMode {
                 RobotData.setStartColor(ColorRange.BLUE);
                 robotData.selectedColor();
 
-                openCVData.createColorLocator(RobotData.getStartColor());
-                openCVData.createVisionPortal();
+                //openCVData.createColorLocator(RobotData.getStartColor());
+                //openCVData.createVisionPortal();
             }
 
             //Right Side
@@ -46,8 +56,8 @@ public class AutoMK2OpMode extends OpMode {
                 RobotData.setStartColor(ColorRange.RED);
                 robotData.selectedColor();
 
-                openCVData.createColorLocator(RobotData.getStartColor());
-                openCVData.createVisionPortal();
+                //openCVData.createColorLocator(RobotData.getStartColor());
+                //openCVData.createVisionPortal();
             }
         }
 
@@ -70,7 +80,7 @@ public class AutoMK2OpMode extends OpMode {
 
             //Left Side
             if (gamepad1.dpad_left){
-                robotData.setStartedLeft(true);
+                RobotData.setStartedLeft(true);
                 rrData.setBeginPose(new Pose2d(0, 0, Math.toRadians(0)));
                 rrData.createDrive();   //Created RoadRunner Robot Object (Mechanum Drive)
                 robotData.selectedPosition();
@@ -95,7 +105,7 @@ public class AutoMK2OpMode extends OpMode {
 
             //Right Side
             else if (gamepad1.dpad_right){
-                robotData.setStartedLeft(false);
+                RobotData.setStartedLeft(false);
                 rrData.setBeginPose(new Pose2d(0, 0, Math.toRadians(0)));
                 rrData.createDrive();   //Created RoadRunner Robot Object (Mechanum Drive)
                 robotData.selectedPosition();
@@ -122,13 +132,14 @@ public class AutoMK2OpMode extends OpMode {
             telemetry.addLine("Completed Initialization.... \n --------------------------" );
             telemetry.addData("Chosen Color",RobotData.getStartColor());
             telemetry.addData("Chosen Position",RobotData.getStartingPosition());
+            atVision.telemetryAprilTag();
             telemetry.update();
         }
     }
 
     @Override
     public void start(){
-        RobotData.setAutoRun(true);
+        //RobotData.setAutoRun(true);
         RobotData.createRuntime();
 
         //Left Side Auto
@@ -162,12 +173,19 @@ public class AutoMK2OpMode extends OpMode {
 
     @Override
     public void loop(){
-        telemetry.addLine("Autonomous Completed!");
-        telemetry.addData("Time Spent: ",RobotData.getRuntime());
+
     }
 
     @Override
     public void stop() {
-        openCVData.closePortal();
+
+        telemetry.addLine("Autonomous Completed!");
+        telemetry.addData("Time Spent: ",RobotData.getRuntime());
+
+        if (robotData.getOpenCVEnabled()){
+            //openCVData.closePortal();
+        }
+
+        atVision.closeVisionPortal();
     }
 }

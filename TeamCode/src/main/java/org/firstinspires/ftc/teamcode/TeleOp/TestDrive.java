@@ -25,7 +25,7 @@ public class TestDrive extends LinearOpMode {
         LBmotor = hardwareMap.get(DcMotor.class, "LBmotor");
         RBmotor = hardwareMap.get(DcMotor.class, "RBmotor");
 
-        imu = hardwareMap.get(IMU.class, "imu");
+        //imu = hardwareMap.get(IMU.class, "imu");
         robotCentric = true;
 
         RFmotor.setDirection(DcMotor.Direction.FORWARD);
@@ -50,6 +50,15 @@ public class TestDrive extends LinearOpMode {
 
     }
 
+    private double functionPower(double powerInput){
+
+        if (powerInput < 0.5){
+            return 2.22222 * powerInput * powerInput * powerInput + 0.446199 * powerInput;
+        }
+
+        return powerInput;
+    }
+
     public void omniDrive(){
 
         double x = gamepad1.left_stick_x;
@@ -66,10 +75,10 @@ public class TestDrive extends LinearOpMode {
             double frontRightPower = (y - x - z) / denominator;
             double backRightPower = (y + x - z) / denominator;
 
-            LFmotor.setPower(frontLeftPower);
-            LBmotor.setPower(backLeftPower);
-            RFmotor.setPower(frontRightPower);
-            RBmotor.setPower(backRightPower);
+            LFmotor.setPower(functionPower(frontLeftPower));
+            LBmotor.setPower(functionPower(backLeftPower));
+            RFmotor.setPower(functionPower(frontRightPower));
+            RBmotor.setPower(functionPower(backRightPower));
         }
 
         //Field POV
