@@ -18,13 +18,19 @@ import org.firstinspires.ftc.vision.opencv.ColorRange;
 public class AutoMK2OpMode extends OpMode {
 
     //Data Classes
-    private AprilTagVision atVision = new AprilTagVision(hardwareMap, telemetry);
-    //private OpenCVData openCVData = new OpenCVData(hardwareMap);
-    private RobotData robotData = new RobotData(hardwareMap, telemetry, atVision);       //Basic Robot Mechanics
-    private RoadRunnerData rrData = new RoadRunnerData(robotData);  //Road Runner Implementation
+    private AprilTagVision atVision;
+    //private OpenCVData openCVData;
+    private RobotData robotData;       //Basic Robot Mechanics
+    private RoadRunnerData rrData;  //Road Runner Implementation
 
     @Override
     public void init(){
+
+        atVision = new AprilTagVision(hardwareMap, telemetry);
+        //openCVData = new OpenCVData(hardwareMap);
+        robotData = new RobotData(hardwareMap, telemetry, atVision);       //Basic Robot Mechanics
+        rrData = new RoadRunnerData(robotData);  //Road Runner Implementation
+        atVision.updateAtHeight(robotData.getTurret().getHeightOfLauncher());
 
         atVision.initAprilTag();
     }

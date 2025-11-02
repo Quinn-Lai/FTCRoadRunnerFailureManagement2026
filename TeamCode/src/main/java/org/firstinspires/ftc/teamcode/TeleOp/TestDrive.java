@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.TeleOp;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
 
@@ -14,8 +16,12 @@ public class TestDrive extends LinearOpMode {
     private DcMotor RFmotor;
     private DcMotor LBmotor;
     private DcMotor RBmotor;
+    private DcMotor caroselMotor;
     private boolean robotCentric;
     private IMU imu;
+    private CRServo testServo1;
+    private ColorSensor cs;
+    private double speed = 0.5;
 
     @Override
     public void runOpMode(){
@@ -24,6 +30,11 @@ public class TestDrive extends LinearOpMode {
         RFmotor = hardwareMap.get(DcMotor.class, "RFmotor");
         LBmotor = hardwareMap.get(DcMotor.class, "LBmotor");
         RBmotor = hardwareMap.get(DcMotor.class, "RBmotor");
+        testServo1 = hardwareMap.get(CRServo.class,"testServo1");
+
+        caroselMotor = hardwareMap.get(DcMotor.class,"carselMotor");
+
+        cs = hardwareMap.get(ColorSensor.class,"cs");
 
         //imu = hardwareMap.get(IMU.class, "imu");
         robotCentric = true;
@@ -46,6 +57,47 @@ public class TestDrive extends LinearOpMode {
                     robotCentric = true;
                 }
             }
+
+            if(gamepad1.square){
+                testServo1.setPower(speed);
+            }
+
+            else if (gamepad1.circle){
+                testServo1.setPower(-speed);
+            }
+
+            else if (gamepad1.triangle){
+                sleep(100);
+                speed += 0.1;
+            }
+
+            else if (gamepad1.cross){
+                sleep(100);
+                speed -= 0.1;
+            }
+
+            else{
+                testServo1.setPower(0);
+            }
+
+            if (gamepad1.dpad_left){
+                caroselMotor.setPower(1);
+            }
+
+            else if (gamepad1.dpad_right){
+                caroselMotor.setPower(-1);
+            }
+
+            else{
+                caroselMotor.setPower(0);
+            }
+
+            telemetry.addData("Speed",speed);
+            telemetry.addData("R",cs.red());
+            telemetry.addData("G",cs.green());
+            telemetry.addData("B",cs.blue());
+            telemetry.update();
+
         }
 
     }
@@ -75,10 +127,16 @@ public class TestDrive extends LinearOpMode {
             double frontRightPower = (y - x - z) / denominator;
             double backRightPower = (y + x - z) / denominator;
 
-            LFmotor.setPower(functionPower(frontLeftPower));
-            LBmotor.setPower(functionPower(backLeftPower));
-            RFmotor.setPower(functionPower(frontRightPower));
-            RBmotor.setPower(functionPower(backRightPower));
+//            LFmotor.setPower(functionPower(frontLeftPower));
+//            LBmotor.setPower(functionPower(backLeftPower));
+//            RFmotor.setPower(functionPower(frontRightPower));
+//            RBmotor.setPower(functionPower(backRightPower));
+
+            LFmotor.setPower(frontLeftPower);
+            LBmotor.setPower(backLeftPower);
+            RFmotor.setPower(frontRightPower);
+            RBmotor.setPower(backRightPower);
+
         }
 
         //Field POV

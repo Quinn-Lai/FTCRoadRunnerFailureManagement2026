@@ -6,24 +6,34 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
-import kotlin._Assertions;
+import org.firstinspires.ftc.teamcode.ClassData.AprilTagVision;
+import org.firstinspires.ftc.teamcode.ClassData.RobotData;
 
 @TeleOp
 public class TestMotors extends LinearOpMode {
 
+    private AprilTagVision atData = new AprilTagVision(hardwareMap,telemetry);
+    private RobotData robot = new RobotData(hardwareMap,telemetry,atData);
+
     private DcMotorEx leftSpinnerMotor;
     private DcMotorEx rightSpinnerMotor;
 
+    //Encoders 28
+    private double TPR = 28.0;
+    private double RPM = 6000;
+    private double maxSpeed = RPM * TPR /60;
     private int speed = 1500;
 
     public void updateSpeed(){
-        if (speed <= 2600) {
+        if (speed <= (maxSpeed-100)) {
+            sleep(100);
             speed += 100;
         }
     }
 
     public void decSpeed(){
         if (speed >= 100) {
+            sleep(100);
             speed -= 100;
         }
     }
@@ -32,14 +42,22 @@ public class TestMotors extends LinearOpMode {
     @Override
     public void runOpMode(){
 
-        leftSpinnerMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"leftSpinnerMotor");
-        rightSpinnerMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"rightSpinnerMotor");
+        atData.updateAtHeight(robot.getTurret().getHeightOfLauncher());
+
+        robot.getDriveTrain().setMainDriver(gamepad1,"Sathya");
+        atData.initAprilTag();
+
+        leftSpinnerMotor = (DcMotorEx)(hardwareMap.get(DcMotor.class,"leftSpinnerMotor"));
+        rightSpinnerMotor = (DcMotorEx)(hardwareMap.get(DcMotor.class,"rightSpinnerMotor"));
 
         leftSpinnerMotor.setDirection(DcMotor.Direction.FORWARD);
         rightSpinnerMotor.setDirection(DcMotor.Direction.REVERSE); //Guess
 
         leftSpinnerMotor.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         rightSpinnerMotor.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+
+        leftSpinnerMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightSpinnerMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         waitForStart();
 
@@ -74,7 +92,7 @@ public class TestMotors extends LinearOpMode {
                 rightSpinnerMotor.setVelocity(0);
             }
 
-            telemetry.addData("Speed",speed);
+            telemetry.addData("Speed",leftSpinnerMotor.getVelocity());
             telemetry.update();
 
         }

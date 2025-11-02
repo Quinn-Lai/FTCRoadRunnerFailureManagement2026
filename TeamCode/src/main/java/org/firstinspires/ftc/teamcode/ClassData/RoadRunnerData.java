@@ -106,9 +106,9 @@ public class RoadRunnerData{
 
     public SequentialAction getTestSeqAction(){
         return new SequentialAction(
-                new InstantAction(() -> robot.getLFmotor().setPower(0.3)),
+                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0.3)),
                 new SleepAction(1),
-                new InstantAction(() -> robot.getLFmotor().setPower(0))
+                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0))
         );
     }
 
@@ -174,7 +174,7 @@ public class RoadRunnerData{
         public boolean run(@NonNull TelemetryPacket packet) {
             //Commands & Methods Go Here
 
-            robot.getLFmotor().setPower(x);
+            robot.getDriveTrain().getLFmotor().setPower(x);
 
             return false;
         }

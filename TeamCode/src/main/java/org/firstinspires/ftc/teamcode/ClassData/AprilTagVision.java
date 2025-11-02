@@ -32,6 +32,7 @@ package org.firstinspires.ftc.teamcode.ClassData;
 
 import android.util.Size;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -48,20 +49,30 @@ import java.util.List;
 
 public class AprilTagVision {
 
-    private static final boolean USE_WEBCAM = true;
-
     private AprilTagProcessor aprilTag;
 
     private VisionPortal visionPortal;
     private HardwareMap hardwareMap;
+    private WebcamName webcam;
     private Telemetry telemetry;
     private double atHeight; //Meters
+    private String[] motifCode;
+    private final double horizontalDist = 0.12065;
+    private final double yCamTri = 0.0381;
 
     public AprilTagVision(HardwareMap hardwareMap, Telemetry telemetry){
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
-        this.atHeight = 10; //Guess IDK
+        this.atHeight = 0.756015; //approximation 0.756015
+
+        webcam = hardwareMap.get(WebcamName.class,"Webcam 1");
     }
+
+
+    public void updateAtHeight(double heightOfLauncher){
+        atHeight -= heightOfLauncher;
+    }
+
 
     public void initAprilTag() {
 
@@ -69,10 +80,10 @@ public class AprilTagVision {
         aprilTag = new AprilTagProcessor.Builder()
 
                 // The following default settings are available to un-comment and edit as needed.
-                .setDrawAxes(false)
-                .setDrawCubeProjection(false)
+                .setDrawAxes(true)
+                .setDrawCubeProjection(true)
                 .setDrawTagOutline(true)
-                //.setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
+                .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
                 .setTagLibrary(AprilTagGameDatabase.getCurrentGameTagLibrary())
                 .setOutputUnits(DistanceUnit.METER, AngleUnit.DEGREES)
 
@@ -91,26 +102,22 @@ public class AprilTagVision {
         // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second (default)
         // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second (default)
         // Note: Decimation can be changed on-the-fly to adapt during a match.
-        //aprilTag.setDecimation(3);
+        aprilTag.setDecimation(3);
 
         // Create the vision portal by using a builder.
         VisionPortal.Builder builder = new VisionPortal.Builder();
 
         // Set the camera (webcam vs. built-in RC phone camera).
-        if (USE_WEBCAM) {
-            builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"));
-        } else {
-            builder.setCamera(BuiltinCameraDirection.BACK);
-        }
+        builder.setCamera(webcam);
 
         // Choose a camera resolution. Not all cameras support all resolutions.
-        //builder.setCameraResolution(new Size(640, 480));
+        builder.setCameraResolution(new Size(640, 480));
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
         builder.enableLiveView(true);
 
         // Set the stream format; MJPEG uses less bandwidth than default YUY2.
-        builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
+        //builder.setStreamFormat(VisionPortal.StreamFormat.YUY2);
 
         // Choose whether or not LiveView stops if no processors are enabled.
         // If set "true", monitor shows solid orange screen if no processors enabled.
@@ -163,28 +170,91 @@ public class AprilTagVision {
 
     }
 
+    public boolean canSeeAT(){
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        return !(currentDetections.isEmpty());
+    }
+
     public double getDisp(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
         double disp = 0;
-        double range = 0;
+        double c = 0;
 
         for (AprilTagDetection detection : currentDetections) {
-
-            if (detection.equals("e")){
-                range = detection.ftcPose.range;
+            if (detection.id == 24 || detection.id == 20){ //Red Blue
+                double range = detection.ftcPose.range;
 
                 //range^2 = height of apriltag^2 + xHorizontal^2
 
-                disp = Math.sqrt(Math.pow(range,2) - atHeight);
+                disp = Math.sqrt(Math.pow(range,2) - Math.pow(atHeight,2)) + yCamTri;
+
+                c = Math.sqrt(Math.pow(disp,2) - Math.pow(horizontalDist,2));
 
                 break;
             }
+        }
+        return c;
+    }
 
+    public void updateMotifCode(){ //Could possibly see oblisk and motif at the same time
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
+        for (AprilTagDetection detection : currentDetections) {
+
+            if (detection.id == 21){
+                motifCode = new String[]{"G","P","P"};
+            }
+
+            else if (detection.id == 22){
+                motifCode = new String[]{"P","G","P"};
+            }
+
+            else if (detection.id == 23){
+                motifCode = new String[]{"P","P","G"};
+            }
+        }
+    }
+
+    public String[] getMotifCode(){
+
+        if (motifCode == null){
+            return new String[]{};
         }
 
-        return disp;
+        return motifCode;
+    }
+
+    public double getYaw(){
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        double yaw = 0;
+
+        for (AprilTagDetection detection : currentDetections) {
+            if (detection.id == 24 || detection.id == 20){ //Red Blue
+                yaw = detection.ftcPose.yaw;
+                break;
+            }
+        }
+
+        return yaw;
+
+    }
+
+    public double getXPos(){
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        double x = 0;
+
+        for (AprilTagDetection detection : currentDetections) {
+            if (detection.id == 24 || detection.id == 20){ //Red Blue
+                x = detection.ftcPose.x;
+                break;
+            }
+        }
+
+        return x;
 
     }
 
