@@ -59,21 +59,29 @@ public class AprilTagVision {
     private String[] motifCode;
     private final double horizontalDist = 0.12065;
     private final double yCamTri = 0.0381;
+    private int idDesired;
+    private String alliance;
 
-    public AprilTagVision(HardwareMap hardwareMap, Telemetry telemetry){
+    public AprilTagVision(HardwareMap hardwareMap, Telemetry telemetry, String alliance){
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
         this.atHeight = 0.756015; //approximation 0.756015
 
         webcam = hardwareMap.get(WebcamName.class,"Webcam 1");
+
+        if (alliance. equals("blue")){
+            idDesired = 20;
+        }
+        else{
+            idDesired = 24;
+        }
+        this.alliance = alliance;
     }
 
 
     public void updateAtHeight(double heightOfLauncher){
         atHeight -= heightOfLauncher;
     }
-
-
     public void initAprilTag() {
 
         // Create the AprilTag processor.
@@ -85,7 +93,7 @@ public class AprilTagVision {
                 .setDrawTagOutline(true)
                 .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
                 .setTagLibrary(AprilTagGameDatabase.getCurrentGameTagLibrary())
-                .setOutputUnits(DistanceUnit.METER, AngleUnit.DEGREES)
+                .setOutputUnits(DistanceUnit.CM, AngleUnit.DEGREES)
 
                 // == CAMERA CALIBRATION ==
                 // If you do not manually specify calibration parameters, the SDK will attempt
@@ -102,7 +110,7 @@ public class AprilTagVision {
         // Decimation = 3 ..  Detect 2" Tag from 4  feet away at 30 Frames Per Second (default)
         // Decimation = 3 ..  Detect 5" Tag from 10 feet away at 30 Frames Per Second (default)
         // Note: Decimation can be changed on-the-fly to adapt during a match.
-        aprilTag.setDecimation(3);
+        aprilTag.setDecimation(1);
 
         // Create the vision portal by using a builder.
         VisionPortal.Builder builder = new VisionPortal.Builder();
@@ -145,35 +153,43 @@ public class AprilTagVision {
 
     public void telemetryAprilTag() {
 
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-        telemetry.addData("# AprilTags Detected", currentDetections.size());
+        if (canSeeAT()){
+            List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+            telemetry.addData("# AprilTags Detected", currentDetections.size());
 
-        // Step through the list of detections and display info for each one.
-        for (AprilTagDetection detection : currentDetections) {
+            // Step through the list of detections and display info for each one.
+            for (AprilTagDetection detection : currentDetections) {
 
-            //Here sort through april tags to find out which motif is which
+                //Here sort through april tags to find out which motif is which
 
-            if (detection.metadata != null) {
-                telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
-                telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (meters)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-                telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
-                telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (degree, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
-            } else {
-                telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
-                telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
+                if (detection.metadata != null) {
+                    telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
+                    telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (meters)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
+                    telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
+                    telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (degree, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
+                } else {
+                    telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
+                    telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
+                }
             }
+
+            telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
+            telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
+            telemetry.addLine("RBE = Range, Bearing & Elevation");
         }
-
-        telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
-        telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
-        telemetry.addLine("RBE = Range, Bearing & Elevation");
-
     }
 
     public boolean canSeeAT(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
-        return !(currentDetections.isEmpty());
+        for (AprilTagDetection detection : currentDetections) {
+            if (detection.id == idDesired){
+                return true;
+            }
+        }
+
+        //return !(currentDetections.isEmpty());
+        return false;
     }
 
     public double getDisp(){
@@ -183,8 +199,8 @@ public class AprilTagVision {
         double c = 0;
 
         for (AprilTagDetection detection : currentDetections) {
-            if (detection.id == 24 || detection.id == 20){ //Red Blue
-                double range = detection.ftcPose.range;
+            if (detection.id == idDesired){ //Red Blue
+                double range = detection.ftcPose.range * 100;
 
                 //range^2 = height of apriltag^2 + xHorizontal^2
 
@@ -232,7 +248,7 @@ public class AprilTagVision {
         double yaw = 0;
 
         for (AprilTagDetection detection : currentDetections) {
-            if (detection.id == 24 || detection.id == 20){ //Red Blue
+            if (detection.id == idDesired){ //Red Blue
                 yaw = detection.ftcPose.yaw;
                 break;
             }
@@ -248,7 +264,7 @@ public class AprilTagVision {
         double x = 0;
 
         for (AprilTagDetection detection : currentDetections) {
-            if (detection.id == 24 || detection.id == 20){ //Red Blue
+            if (detection.id == idDesired){ //Red Blue
                 x = detection.ftcPose.x;
                 break;
             }
@@ -256,6 +272,10 @@ public class AprilTagVision {
 
         return x;
 
+    }
+
+    public String getAlliance(){
+        return alliance;
     }
 
 }

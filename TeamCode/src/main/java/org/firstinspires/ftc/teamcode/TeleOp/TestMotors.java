@@ -12,7 +12,7 @@ import org.firstinspires.ftc.teamcode.ClassData.RobotData;
 @TeleOp
 public class TestMotors extends LinearOpMode {
 
-    private AprilTagVision atData = new AprilTagVision(hardwareMap,telemetry);
+    private AprilTagVision atData = new AprilTagVision(hardwareMap,telemetry, "blue");
     private RobotData robot = new RobotData(hardwareMap,telemetry,atData);
 
     private DcMotorEx leftSpinnerMotor;
@@ -44,7 +44,7 @@ public class TestMotors extends LinearOpMode {
 
         atData.updateAtHeight(robot.getTurret().getHeightOfLauncher());
 
-        robot.getDriveTrain().setMainDriver(gamepad1,"Sathya");
+        robot.getDriveTrain().setMode(gamepad1,"Sathya");
         atData.initAprilTag();
 
         leftSpinnerMotor = (DcMotorEx)(hardwareMap.get(DcMotor.class,"leftSpinnerMotor"));

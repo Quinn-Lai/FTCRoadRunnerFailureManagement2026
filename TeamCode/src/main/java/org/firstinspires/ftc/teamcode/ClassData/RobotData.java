@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -156,16 +155,18 @@ public class RobotData{
         private DcMotor RFmotor;
         private DcMotor LBmotor;
         private DcMotor RBmotor;
+
         //Sensors
         private IMU imu;
+
         //Booleans
         private boolean robotCentric;
-        //Driver
-        private Gamepad mainDriver;
-        private String tag;
 
-        //private Gamepad subDriver;
-        private boolean abortNow;
+        //Driver
+        private Gamepad mode;
+        private String tag;
+        private boolean defaultToAutoAim;
+        private boolean endGameActive;
 
         public DriveTrain(HardwareMap hardwareMap){
             //Basic Motors
@@ -184,14 +185,12 @@ public class RobotData{
             LFmotor.setDirection(DcMotor.Direction.REVERSE);
             LBmotor.setDirection(DcMotor.Direction.REVERSE);
 
-            //Booleans
-            //AUTO_RUN = false;
             robotCentric = true;
             openCVEnabled = false;
             pendingColor = true;
             pendingPosition = true;
-
-            abortNow = false;
+            defaultToAutoAim = true;
+            endGameActive = false;
 
             if (!robotCentric){
                 imu = hardwareMap.get(IMU.class, "imu");
@@ -202,58 +201,72 @@ public class RobotData{
             }
         }
 
-        //Emergency Abort
-        public void abortCheck(){ //This works?
-            if (mainDriver.share){
-                abortNow = true;
-                return;
-            }
-            abortNow = false;
+        public Gamepad getMode() {
+            return mode;
         }
-        public boolean getAbortStatus(){
-            return abortNow;
-        }
-        public Gamepad getMainDriverGamepad() {
-            return mainDriver;
-        }
-        public String getMainDriver(){
+        public String getTag(){
             return tag;
         }
-        public void setMainDriver(Gamepad mainDriver, String tag) {
+        public void setMode(Gamepad mainDriver, String tag) {
 
             //Only Changes Drivers if the person trying to swap isn't already the main driver
             //if (!(this.mainDriver.equals(mainDriver))){
             //this.subDriver = this.mainDriver;   //current main driver becomes P2
-            this.mainDriver = mainDriver;       //new main driver becomes selected player
+            this.mode = mainDriver;       //new main driver becomes selected player
             this.tag = tag;
-            this.mainDriver.setLedColor(0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
+            this.mode.setLedColor(0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
             //this.subDriver.setLedColor(0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
             //}
         }
-        public void setMainDriver(Gamepad mainDriver, String tag, Gamepad optionalSubDriver) {
-            //this.subDriver = optionalSubDriver;
-            this.mainDriver = mainDriver;
 
-            this.mainDriver.setLedColor(0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
-            //this.subDriver.setLedColor(0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
-            this.tag = tag;
+        public void switchMode(){
+
+            if (defaultToAutoAim){
+                defaultToAutoAim = false;
+            }
+
+            else{
+                defaultToAutoAim = true;
+            }
         }
 
-        public void checkGameTimeRumble(){
+        public boolean getCurrentMode(){
+            return defaultToAutoAim;
+        }
+
+        public void updateModeColor(){
+
+            if (!endGameActive){
+
+                if (defaultToAutoAim){
+                    mode.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
+
+                }
+
+                else{
+                    mode.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                }
+
+
+            }
+
+        }
+
+        //Feedback
+        public void checkEndgame(){
             double currentRuntime = getRuntime();
-            //telemetry.addLine("Time:" + currentRuntime + "Seconds");
 
             if (currentRuntime >= 90 && currentRuntime <= 92){
-                mainDriver.rumble(2);
-                //subDriver.rumble(2);
-                mainDriver.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
-                //subDriver.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
+
+                endGameActive = true;
+
+                mode.rumble(2);
+                mode.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
                 telemetry.addLine("END GAME!");
             }
 
             else if (currentRuntime >= 110 && currentRuntime <= 120){
-                mainDriver.rumble(2);
-                //subDriver.rumble(2);
+                mode.rumble(2);
                 double time = 120 - currentRuntime;
                 telemetry.addLine(Math.floor(time) + " Seconds Left!");
             }
@@ -267,15 +280,12 @@ public class RobotData{
             return LFmotor;
         }
 
-        public DcMotor getRFmotor(){
-            return RFmotor;
-        }
-
+        //Drive Code
         public void omniDrive(){
 
-            double x = mainDriver.left_stick_x;
-            double y = -mainDriver.left_stick_y;
-            double z = mainDriver.right_stick_x;
+            double x = mode.left_stick_x;
+            double y = -mode.left_stick_y;
+            double z = mode.right_stick_x;
 
             //Robot POV
             if (robotCentric){
@@ -315,7 +325,6 @@ public class RobotData{
                 RBmotor.setPower(backRightPower);
             }
         }
-
         public void omniDrive(Gamepad gamepad) {
 
             double x = gamepad.left_stick_x;
@@ -338,24 +347,17 @@ public class RobotData{
                 RBmotor.setPower(backRightPower);
             }
         }
-//    private double convertServo(double angle, double lateralDegree,double servoAngle, double referenceDegree){
-//        //x = desired angle in degrees
-//        //y = servoAngle
-//
-//        double slope = (servoAngle)/(referenceDegree-lateralDegree);
-//
-//        return slope * (angle-lateralDegree); //Servo Degree converted from the angle
-//    }
-
-
 
     }
     public class PIDControl{
-        private double kP = 5.5;
+//        private double kP = 5.5;
+//
+//        private double kI = 0.015;
+//        private double kD = 0.5;
+        private double kP = 0.79;
 
-        private double kI = 0.015;
-        private double kD = 0.5;
-
+        private double kI = 0.222;
+        private double kD = 0.01;
 
         private ElapsedTime PIDTimer = new ElapsedTime();
 
@@ -418,6 +420,8 @@ public class RobotData{
         //Motor Params
         private final double spinWheelRadius = 0.096/2; //Meters
         private final double w = 28.0; //Ticks
+
+        private boolean toggleTurretAim;
 //        private final double dragX = 1.67;
 //        private final double dragY = 1.1;
 
@@ -430,9 +434,25 @@ public class RobotData{
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
 
             shooterServo = hardwareMap.get(Servo.class,"shooterServo");
+            toggleTurretAim = false;
         }
 
+        public void switchTurretMode(){
+            if (toggleTurretAim){
+                toggleTurretAim = false;
+            }
+
+            else{
+                toggleTurretAim = true;
+            }
+        }
+        public boolean isToggleTurretAim(){
+            return toggleTurretAim;
+        }
+
+
         //Physics Calculations
+
         private double getYEquation(double time){
             return vY * time + 0.5 * a * Math.pow(time, 2);
         }
@@ -524,12 +544,12 @@ public class RobotData{
 
         public void centerShot(double x, boolean e){
 
-            if (x < -0.3){
-                spinnerServo.setPower(0.5);
+            if (x < -5){
+                spinnerServo.setPower(0.1);
             }
 
-            else if (x > 0.3){
-                spinnerServo.setPower(-0.5);
+            else if (x > 5){
+                spinnerServo.setPower(-0.1);
             }
 
             else{
@@ -537,6 +557,15 @@ public class RobotData{
             }
 
         }
+
+        public void angleLeftSpin(){
+            spinnerServo.setPower(-0.15);
+        }
+
+        public void angleRightSpin(){
+            spinnerServo.setPower(0.15);
+        }
+
 
         public void centerShot(double yaw){
 
@@ -565,8 +594,8 @@ public class RobotData{
 
             //Scuffed Logic Here (Switch it)
             if (disp < 2.5){
-                //powerShooterMotor(TPS);
-                shooterMotor.setVelocity(TPS);
+                powerShooterMotor(TPS);
+                //shooterMotor.setVelocity(TPS);
             }
             else{
                 shooterMotor.setVelocity(constants.longTPS);
@@ -610,25 +639,38 @@ public class RobotData{
         private DigitalChannel touchSensor;
         private DcMotorEx caroselMotor;
         private ColorSensor csIntake;
+        private DistanceSensor elevatorBeam;
         private DistanceSensor csIntakeDist;
         private String[] inventory;
         private CRServo intakeServo;
         private boolean intakeServoOn;
+        //FailSafe Timers
         private ElapsedTime elevatorTimer;
+        private ElapsedTime cycleTimer;
 
         //Detection
         private String[] pattern;
 
         //private String[] storage;
-        private int currentCaroselPos;
+
+        //Cycling
+        private int currentCaroselGlobalPos;
+        private int currentCycle;
+        private boolean cycleInProg;
+        private boolean artifactDetected;
 
         public Carosel(HardwareMap hardwareMap){
 
-            currentCaroselPos = 0;
+            artifactDetected = false;
+            cycleInProg = false;
+            currentCycle = 0;
+            currentCaroselGlobalPos = 0;
             elevatorTimer = new ElapsedTime();
+            cycleTimer = new ElapsedTime();
 
             elevatorTop = false;
             elevatorServo = hardwareMap.get(Servo.class,"elevatorServo");
+            elevatorBeam = hardwareMap.get(DistanceSensor.class,"elevatorBeam");
 
             magneticLS = hardwareMap.get(DigitalChannel.class,"magneticLS");
             caroselMotor = (DcMotorEx)hardwareMap.get(DcMotor.class, "caroselMotor");
@@ -658,19 +700,6 @@ public class RobotData{
             intakeServo.setPower(power);
         }
 
-
-        public void checkIntakeArtifact(Gamepad gamepad){
-            if (detectedArtifact()){
-                updateInventory();
-                killIntakeServo();
-                cycleNearestEmpty(gamepad);
-            }
-        }
-
-        private void updateInventory(){
-            inventory[currentCaroselPos] = getColorIntake();
-        }
-
         public void shiftElevator(){
 
             if (!elevatorTop){
@@ -692,10 +721,14 @@ public class RobotData{
         }
 
         public void checkDeriseElevator(){
-            if (elevatorTop && elevatorTimer.milliseconds() > 1100){
+            if (elevatorTop && (elevatorTimer.milliseconds() > 1500 || isElevatorTop())){
                 elevatorServo.setPosition(constants.ELEVATOR_BOT);
                 elevatorTop = false;
             }
+        }
+
+        private boolean isElevatorTop(){
+            return elevatorBeam.getDistance(DistanceUnit.CM) < 5;
         }
 
         public void killIntakeServo(){
@@ -743,38 +776,56 @@ public class RobotData{
             telemetry.addData("Inventory: ", inventory[0] + ", " + inventory[1] + ", " + inventory[2]);
         }
 
-        public void cycleNearestEmpty(Gamepad gamepad){
-
-            if (checkIfEmptySpot() && !elevatorTop){
-                telemetry.addData("Empty Spot: ", getClosestEmpty());
-                cyclePositionalSpot(getClosestEmpty(),gamepad);
+        public void updateCaroselReaction(){
+            if (detectedArtifact() && checkIfEmptySpot()){
+                artifactDetected = true;
+                startCycling(getClosestEmpty());
             }
         }
 
-        public void cyclePositionalSpot(int pos, Gamepad gamepad){
+        //purposely need to create a subzone
 
-            currentCaroselPos = pos;
+        public boolean getArtifactDetected(){
+            return artifactDetected;
+        }
 
-            if (pos == 0){
-                setCaroselPosition(constants.caroselPos[0], gamepad);
-            }
+//        public void cyclePositionalSpot(int pos, Gamepad gamepad){
+//
+//            currentCaroselPos = pos;
+//
+//            if (pos == 0){
+//                setCaroselPosition(constants.caroselPos[0], gamepad);
+//            }
+//
+//            else if (pos == 1){
+//                setCaroselPosition(constants.caroselPos[1], gamepad);
+//            }
+//
+//            else if (pos == 2){
+//                setCaroselPosition(constants.caroselPos[2], gamepad);
+//            }
+//
+//        }
 
-            else if (pos == 1){
-                setCaroselPosition(constants.caroselPos[1], gamepad);
-            }
+        public void zeroCaroselMotor(){
+            caroselMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+            currentCaroselGlobalPos = 0;
+            currentCycle = 0;
+        }
 
-            else if (pos == 2){
-                setCaroselPosition(constants.caroselPos[2], gamepad);
-            }
+        public void incCaroselMotor(){
+            currentCaroselGlobalPos += 5;
+        }
 
+        public void killCaroselMotor(){
+            caroselMotor.setVelocity(0);
         }
 
         private int getClosestEmpty(){
 
-            if (inventory[currentCaroselPos].equals("Empty")){
-                return currentCaroselPos;
+            if (inventory[currentCycle].equals("Empty")){
+                return currentCycle;
             }
-
             else if (inventory[incrementCurrentPos(1)].equals("Empty")) {
                 return incrementCurrentPos(1);
             }
@@ -786,13 +837,140 @@ public class RobotData{
 
         }
 
+        //For Manual Control
+
+        public int getCurrentCycle(){
+            return currentCycle;
+        }
+
+        private int getCycleError(int desiredCycle){
+
+            telemetry.addData("PosTESTTHIS",desiredCycle - currentCycle);
+            if (desiredCycle < currentCycle){
+
+                //Limited Case Structure
+                if (Math.abs(currentCycle - desiredCycle) == 1){
+                    return 2;
+                }
+
+                else{
+                    return 1;
+                }
+
+            }
+
+            else if (desiredCycle > currentCycle){
+                telemetry.addData("Pos1",desiredCycle - currentCycle);
+                return desiredCycle - currentCycle;
+            }
+
+            else{
+                return 0;
+            }
+        }
+
+//        public void cycleCarosel(int desiredCycle, Gamepad gamepad){
+//            if (!elevatorTop){
+//
+//                intakeServo.setPower(constants.INTAKE_POWER);
+//
+//                int error = getCycleError(desiredCycle);
+//
+//                currentCycle = desiredCycle;
+//                ElapsedTime temp = new ElapsedTime();
+//
+//                currentCaroselGlobalPos = constants.caroselIncrement * error + currentCaroselGlobalPos;
+//
+//                caroselMotor.setTargetPosition(currentCaroselGlobalPos);
+//                caroselMotor.setVelocity(1500);
+//                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+//
+//                temp.reset();
+//
+//                while (caroselMotor.isBusy()){
+//
+//                    double time = temp.milliseconds();
+//
+//                    getDriveTrain().omniDrive(gamepad);
+//
+//                    if (time > 1000){
+//                        break;
+//                    }
+//
+//                }
+//
+//                caroselMotor.setVelocity(0);
+//
+//                intakeServo.setPower(constants.INTAKE_OFF);
+//            }
+//        }
+
+//        public void cycleInventory(int cycleNumber){
+//            for (int count = 0; count < cycleNumber; count++){
+//                String temp = inventory[2];
+//                inventory[2] = inventory[1];
+//                inventory[1] = inventory[0];
+//                inventory[0] = temp;
+//            }
+//        }
+
+        private void updateInventory(int desiredCycle){
+            inventory[desiredCycle] = getColorIntake();
+        }
+
+        public void startCycling(int desiredCycle){
+            if (!elevatorTop){
+                int error = getCycleError(desiredCycle);
+                updateInventory(currentCycle);
+                currentCycle = desiredCycle;
+                //cycleInventory(error);
+
+                currentCaroselGlobalPos = constants.caroselIncrement * error + currentCaroselGlobalPos;
+                telemetry.addData("Position Run To: ", currentCaroselGlobalPos);
+
+                caroselMotor.setTargetPosition(currentCaroselGlobalPos);
+                caroselMotor.setVelocity(500);
+                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+
+                cycleTimer.reset();
+                cycleInProg = true;
+            }
+        }
+
+        public void checkCycleEnd(){
+
+            if (caroselMotor.isBusy() && cycleInProg){
+                intakeServo.setPower(constants.INTAKE_POWER);
+                intakeServoOn = true;
+
+                if (cycleTimer.milliseconds() > 1000){
+                    telemetry.addLine("test");
+                    intakeServo.setPower(constants.INTAKE_OFF);
+                    intakeServoOn = false;
+                    cycleInProg = false;
+                }
+
+            }
+
+            else{
+                //caroselMotor.setVelocity(0);
+                if (cycleInProg){
+                    telemetry.addLine("test");
+                    intakeServo.setPower(constants.INTAKE_OFF);
+                    intakeServoOn = false;
+                    cycleInProg = false;
+                }
+                artifactDetected = false; //For Auto Aim ends subzone
+            }
+        }
+
         public int incrementCurrentPos(int inc){
 
-            int nextPos = currentCaroselPos + inc;
+            int nextPos = currentCycle + inc;
 
             if (nextPos > 2){
 
-                if (Math.abs(nextPos - currentCaroselPos) == 1){
+                if (inc == 1){
                     nextPos = 0;
                 }
 
@@ -823,10 +1001,9 @@ public class RobotData{
         }
 
         private boolean detectedArtifact(){
+            float[] HSV = getHSV();
 
-            telemetry.update();
-
-            return csIntakeDist.getDistance(DistanceUnit.CM) < 3;
+            return csIntakeDist.getDistance(DistanceUnit.CM) < 3 || HSV[2] < 100;
         }
 
         public void intakeArtifact(){
@@ -866,7 +1043,7 @@ public class RobotData{
             return !magneticLS.getState();
         }
 
-        private float[] getHSV(int red, int green, int blue){
+        public float[] getHSV(){
 
             /*
             double redNorm = (double)(red)/255;
@@ -938,10 +1115,6 @@ public class RobotData{
 //        }
 
 
-        public int getCurrentCaroselPos() {
-            return currentCaroselPos;
-        }
-
         public String getColorIntake() {
 
             /*
@@ -960,25 +1133,17 @@ public class RobotData{
             }
              */
             if (detectedArtifact()) {
-                float[] HSV = getHSV(csIntake.red(), csIntake.green(), csIntake.blue());
+                float[] HSV = getHSV();
 
                 telemetry.addData("HSV", HSV[0] + "," + HSV[1] + "," + HSV[2]);
 
-//            if (HSV[2] < 80){
-//                return "Empty";
-//            }
-//
-//            else if (HSV[0] > 200 && HSV[0] < 300){
-//                return "Purple";
-//            }
-
-                if (csIntake.red() >= 100 && csIntake.green() > 120 && csIntake.green() < 250 && csIntake.blue() > 250) {
-                    return "Purple";
-                } else if (csIntake.red() < 100 && csIntake.green() < 200 && csIntake.blue() < 150) {
+                if (HSV[0] < 200){
                     return "Green";
                 }
 
-                return "Empty";
+                else if (HSV[0] >= 200){
+                    return "Purple";
+                }
 
             }
 

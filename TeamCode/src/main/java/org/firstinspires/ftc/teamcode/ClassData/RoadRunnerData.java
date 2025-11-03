@@ -83,6 +83,20 @@ public class RoadRunnerData{
         packet = new TelemetryPacket();
     }
 
+
+    //TeleOp
+
+    public SequentialAction getTestSeqAction(){
+        return new SequentialAction(
+                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0.3)),
+                new SleepAction(1),
+                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0))
+        );
+    }
+    public void addTeleOpAction(SequentialAction action){
+        teleOpActions.add(action);
+    }
+
     public void runTeleOpActions(){
 
         updateTelemetryPacket();
@@ -99,21 +113,6 @@ public class RoadRunnerData{
 
         dash.sendTelemetryPacket(packet);
 
-    }
-
-
-    //TESTING
-
-    public SequentialAction getTestSeqAction(){
-        return new SequentialAction(
-                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0.3)),
-                new SleepAction(1),
-                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0))
-        );
-    }
-
-    public void addTeleOpAction(SequentialAction action){
-        teleOpActions.add(action);
     }
 
 

@@ -10,7 +10,8 @@ public class RobotConstants {
 
     private double encoderRes = 384.5; //435
     public final double longTPS = 1800;
-    public Integer[] caroselPos = new Integer[]{0,(int)encoderRes/3,(int)(encoderRes * 2/3)};
+    //public Integer[] caroselPos = new Integer[]{0,(int)encoderRes/3,(int)(encoderRes * 2/3)};
+    public final int caroselIncrement = (int)encoderRes/3;
 
     public static double xDrag = 2.67;
     public static double yDrag = 2.67;

@@ -26,7 +26,7 @@ public class AutoMK2OpMode extends OpMode {
     @Override
     public void init(){
 
-        atVision = new AprilTagVision(hardwareMap, telemetry);
+        atVision = new AprilTagVision(hardwareMap, telemetry, "blue");
         //openCVData = new OpenCVData(hardwareMap);
         robotData = new RobotData(hardwareMap, telemetry, atVision);       //Basic Robot Mechanics
         rrData = new RoadRunnerData(robotData);  //Road Runner Implementation
