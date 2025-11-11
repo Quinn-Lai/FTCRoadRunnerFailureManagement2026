@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Autonomous;/*
+package org.firstinspires.ftc.teamcode.RobotV1.Autonomous;/*
 
 import android.util.Size;
 
@@ -14,8 +14,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.robot.Robot;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.teamcode.ClassData.RoadRunnerData;
-import org.firstinspires.ftc.teamcode.ClassData.RobotData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RoadRunnerData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RobotData;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.opencv.ColorBlobLocatorProcessor;

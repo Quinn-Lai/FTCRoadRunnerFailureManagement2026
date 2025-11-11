@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.ClassData;
+package org.firstinspires.ftc.teamcode.RobotV1.ClassData;
 
 import androidx.annotation.NonNull;
 
@@ -34,34 +34,39 @@ public class RoadRunnerData{
 
     //Note to Future Me: Can either create a new robot object for roadrunner actions or use a pre-existing one to stay consistent
 
+    //----------------------------------------
     public RoadRunnerData(RobotData robot){
         this.robot = robot;
 
         teleOpActions = new ArrayList<>();
         trajectoryBuilt = new ArrayList<Action>();
+        beginPose = null;
     }
 
-    //Getters and Setters
+    //----------------------------------------
+
+    //Trajectories
 
     public Pose2d getBeginPose() {
         return beginPose;
     }
-
     public void setBeginPose(Pose2d beginPose) {
         this.beginPose = beginPose;
     }
 
+    //----------------------------------------
+
+    //Classes
+
     public RobotData getRobot() {
         return robot;
     }
-
     public void updateRobot(RobotData robot) {
         this.robot = robot;
     }
     public MecanumDrive getDrive() {
         return drive;
     }
-
     public void createDrive() {
         if (beginPose != null){
             drive = new MecanumDrive(robot.getHardwareMap(), beginPose);
@@ -71,6 +76,10 @@ public class RoadRunnerData{
             drive = new MecanumDrive(robot.getHardwareMap(), new Pose2d(0,0,0));
         }
     }
+
+    //----------------------------------------
+
+    //Dashboard
 
     public void createDashboard(){
         dash = FtcDashboard.getInstance();
@@ -83,6 +92,7 @@ public class RoadRunnerData{
         packet = new TelemetryPacket();
     }
 
+    //----------------------------------------
 
     //TeleOp
 
@@ -96,7 +106,6 @@ public class RoadRunnerData{
     public void addTeleOpAction(SequentialAction action){
         teleOpActions.add(action);
     }
-
     public void runTeleOpActions(){
 
         updateTelemetryPacket();
@@ -115,12 +124,14 @@ public class RoadRunnerData{
 
     }
 
+    //----------------------------------------
+
+    //Build Trajectory
 
     //Build Trajectory Path Array List
     public ArrayList<Action> getTrajectoryPath() {
         return trajectoryBuilt;
     }
-
     public void addTrajectory(Action traj) {
         trajectoryBuilt.add(traj);
     }
@@ -156,11 +167,9 @@ public class RoadRunnerData{
     }
 
 
-    //------------------------------------------------------
+    //----------------------------------------
 
     //Robot Trajectories Methods
-
-    //------------------------------------------------------
 
     public class Reminder implements Action{ //Creates Class, so each class is represented as an Action
 
@@ -178,19 +187,11 @@ public class RoadRunnerData{
             return false;
         }
     }
-
     public Action doReminder(double x) { //Creates method to return the action as an object
             return new Reminder(x); //Constructor
     }
-
     //Action test = new Reminder(1); //Does the same thing as above
-
-    //------------------------------------------------------
-
     //(Modified) Sequential Robot Trajectories Using Methods
-
-    //------------------------------------------------------
-
     public SequentialAction getSequentialConcept(){
 
         SequentialAction concept = new SequentialAction(

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.TeleOp;
+package org.firstinspires.ftc.teamcode.RobotV1.TeleOp;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -68,6 +68,10 @@ public class PIDTuner extends LinearOpMode {
             if (gamepad1.left_bumper){
                 testMotor.setVelocity(PIDShooter(testMotor.getVelocity(),TPS));
             }
+            else if(gamepad1.right_bumper){
+                testMotor.setVelocity(TPS);
+            }
+
             else {
                 testMotor.setVelocity(0);
             }

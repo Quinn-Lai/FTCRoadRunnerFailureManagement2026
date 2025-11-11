@@ -5,8 +5,8 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.ClassData.RoadRunnerData;
-import org.firstinspires.ftc.teamcode.ClassData.RobotData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RoadRunnerData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RobotData;
 
 @TeleOp
 @Disabled

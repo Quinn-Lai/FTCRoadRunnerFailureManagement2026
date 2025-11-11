@@ -1,4 +1,6 @@
-package org.firstinspires.ftc.teamcode.ClassData;
+package org.firstinspires.ftc.teamcode.RobotV1.ClassData;
+
+import static java.lang.Thread.sleep;
 
 import android.graphics.Color;
 
@@ -25,7 +27,7 @@ import org.firstinspires.ftc.vision.opencv.ColorRange;
 
 //Class to Organize each robot part and store the objects of each part of the robot
 //Should be imported into RoadRunnerData to utilize each component
-public class RobotData{
+public class RobotData {
     private HardwareMap hardwareMap;
     private Telemetry telemetry;
     private static ColorRange startColor;
@@ -141,7 +143,6 @@ public class RobotData{
             getDriveTrain().omniDrive();
         }
     }
-
     public void updateTelemetry(Telemetry telemetry){
         this.telemetry = telemetry;
     }
@@ -201,6 +202,10 @@ public class RobotData{
             }
         }
 
+        //----------------------------------------
+
+        //Mode
+
         public Gamepad getMode() {
             return mode;
         }
@@ -218,7 +223,6 @@ public class RobotData{
             //this.subDriver.setLedColor(0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
             //}
         }
-
         public void switchMode(){
 
             if (defaultToAutoAim){
@@ -229,11 +233,9 @@ public class RobotData{
                 defaultToAutoAim = true;
             }
         }
-
         public boolean getCurrentMode(){
             return defaultToAutoAim;
         }
-
         public void updateModeColor(){
 
             if (!endGameActive){
@@ -252,35 +254,11 @@ public class RobotData{
 
         }
 
-        //Feedback
-        public void checkEndgame(){
-            double currentRuntime = getRuntime();
 
-            if (currentRuntime >= 90 && currentRuntime <= 92){
+        //----------------------------------------
 
-                endGameActive = true;
+        //DT
 
-                mode.rumble(2);
-                mode.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
-                telemetry.addLine("END GAME!");
-            }
-
-            else if (currentRuntime >= 110 && currentRuntime <= 120){
-                mode.rumble(2);
-                double time = 120 - currentRuntime;
-                telemetry.addLine(Math.floor(time) + " Seconds Left!");
-            }
-        }
-        public void displayTelemetryData(){
-            telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
-            telemetry.addData("Main Driver: ", tag);
-        }
-
-        public DcMotor getLFmotor(){
-            return LFmotor;
-        }
-
-        //Drive Code
         public void omniDrive(){
 
             double x = mode.left_stick_x;
@@ -348,37 +326,62 @@ public class RobotData{
             }
         }
 
+        //----------------------------------------
+
+        //Feedback
+
+        public void checkEndgame(){
+            double currentRuntime = getRuntime();
+
+            if (currentRuntime >= 90 && currentRuntime <= 92){
+
+                endGameActive = false; //TODO: Leave as false temp
+
+                mode.rumble(2);
+                mode.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
+                telemetry.addLine("END GAME!");
+            }
+
+            else if (currentRuntime >= 110 && currentRuntime <= 120){
+                mode.rumble(2);
+                double time = 120 - currentRuntime;
+                telemetry.addLine(Math.floor(time) + " Seconds Left!");
+            }
+        }
+        public void displayTelemetryData(){
+            telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
+            telemetry.addData("Main Driver: ", tag);
+        }
+
+        //----------------------------------------
+
+        //Misc
+
+        public DcMotor getLFmotor(){
+            return LFmotor;
+        }
+
+        //----------------------------------------
+
     }
     public class PIDControl{
 //        private double kP = 5.5;
 //
 //        private double kI = 0.015;
 //        private double kD = 0.5;
-        private double kP = 0.79;
-
-        private double kI = 0.222;
-        private double kD = 0.01;
-
+        private double kP = 6.7;
+        private double kI = 0.53;
+        private double kD = 0.3;
         private ElapsedTime PIDTimer = new ElapsedTime();
-
         private double integralSum = 0;
         private double lastError = 0;
-
         public String getPIDCos(){
             return kP + ", " + kI + ", " + kD;
         }
 
-        public void changeKp(double val){
-            kP += val;
-        }
+        //----------------------------------------
 
-        public void changeKI(double val){
-            kI += val;
-        }
-
-        public void changeKD(double val){
-            kD += val;
-        }
+        //PID
 
         public double PIDShooter(double current, double desired) {
 
@@ -414,18 +417,23 @@ public class RobotData{
         private final double height = 1.2 - heightOfLauncher; //Meters 1.05
         private final double vY = Math.sqrt(2 * -a * height);
         private double vX = 0;
-
         private double vX0 = 0; //initial vX of the robot at an instant in time
 
         //Motor Params
         private final double spinWheelRadius = 0.096/2; //Meters
         private final double w = 28.0; //Ticks
-
         private boolean toggleTurretAim;
+        private boolean toggleTurretManualClose;
+
+        private ElapsedTime scrimTimerAuto;
 //        private final double dragX = 1.67;
 //        private final double dragY = 1.1;
 
+        //----------------------------------------
+
         private Turret(HardwareMap hardwareMap){
+            scrimTimerAuto = new ElapsedTime();
+
             shooterMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotor"); //temp
             spinnerServo = hardwareMap.get(CRServo.class, "spinnerServo");
             shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -435,32 +443,62 @@ public class RobotData{
 
             shooterServo = hardwareMap.get(Servo.class,"shooterServo");
             toggleTurretAim = false;
+            toggleTurretManualClose = false;
+
         }
+
+        //----------------------------------------
+
+        //Turret Mode
 
         public void switchTurretMode(){
             if (toggleTurretAim){
                 toggleTurretAim = false;
+                toggleTurretManualClose = false;
             }
 
             else{
                 toggleTurretAim = true;
+                toggleTurretManualClose = false;
             }
         }
         public boolean isToggleTurretAim(){
             return toggleTurretAim;
         }
 
+        public void switchTurretManualClose(){
+            if (toggleTurretManualClose){
+                toggleTurretManualClose = false;
+                toggleTurretAim = false;
+            }
+
+            else{
+                toggleTurretManualClose = true;
+                toggleTurretAim = false;
+            }
+        }
+        public boolean isToggleTurretManualClose(){
+            return toggleTurretManualClose;
+        }
+
+        public void reverseShooterMotor(){
+            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+        }
+
+        public void unreverseShooterMotor(){
+            shooterMotor.setDirection(DcMotor.Direction.FORWARD);
+        }
+
+        //----------------------------------------
 
         //Physics Calculations
 
         private double getYEquation(double time){
             return vY * time + 0.5 * a * Math.pow(time, 2);
         }
-
         private double getXEquation(double time){
             return vX * time;
         }
-
         public double getHeightOfLauncher(){
             return heightOfLauncher;
         }
@@ -469,51 +507,40 @@ public class RobotData{
         private double getTimeExtrema(){
             return -vY/a; //2's cancel
         }
-
         private double getVy(){
             return vY ;
         }
-
         private double getInitalVelocityX(){
             return vX0;
         }
-
         private double getVx(double disp){
             return ((disp / getTimeExtrema()) + vX0);
         }
-
         private double getVelocityTotal(double disp){
             return Math.sqrt(Math.pow(getVy(),2) + Math.pow(getVx(disp),2)) * RobotConstants.yDrag;
         }
-
         private double getAngleTotal(double disp){
             return Math.atan2(getVy(),getVx(disp)) * (180 / Math.PI);
         }
-
-        //Motor Conversions
-
         private double getSpinWheelRadius(){
             return spinWheelRadius;
         }
-
         private double getRadiansPerSecond(double disp){ //From Velocity
             return getVelocityTotal(disp)/getSpinWheelRadius();
         }
-
-        //Useless just for Cosmetics
         private double getDesiredRPM(double disp){ //From Radians Per SEcond
             return getRadiansPerSecond(disp) * 60 / (2 * Math.PI);
         }
-
         private double getW(){
             return w;
         }
-
         private double getTPS(double disp){ //From Radians per Second
             return (getRadiansPerSecond(disp) * getW()) / (2 * Math.PI);
         }
 
-        //Shooter Actions
+        //----------------------------------------
+
+        //Shooter
 
         public void powerShooterMotor(double TPS){
 
@@ -526,11 +553,14 @@ public class RobotData{
             shooterMotor.setVelocity(0);
         }
 
+        //----------------------------------------
+
+        //Hood Angle
+
         private double convertDegToServo(double angle){
             return -0.031506 * angle + 1.99244;
         }
-
-        private void angleRobot(double disp){
+        public void angleRobot(double disp){
 
             //double desiredAngle = getAngleTotal(disp)+15;
             double desiredAngle = getAngleTotal(disp) + 15;
@@ -541,6 +571,10 @@ public class RobotData{
             //servo.setPosition(convertDegToServo(desiredAngle));
 
         }
+
+        //----------------------------------------
+
+        //Hood Spinner
 
         public void centerShot(double x, boolean e){
 
@@ -557,19 +591,15 @@ public class RobotData{
             }
 
         }
-
         public void angleLeftSpin(){
             spinnerServo.setPower(-0.15);
         }
-
         public void angleRightSpin(){
             spinnerServo.setPower(0.15);
         }
-
-
         public void centerShot(double yaw){
 
-             if (yaw < -0.1){
+            if (yaw < -0.1){
                 spinnerServo.setPower(1);
             }
 
@@ -582,12 +612,30 @@ public class RobotData{
             }
 
         }
-
         public void killSpinnerServo(){
             spinnerServo.setPower(0);
         }
 
+        //----------------------------------------
+
+        //Misc
         public void aimBall(double disp){
+            angleRobot(disp);
+            double TPS = getTPS(disp);
+            //powerShooterMotor(TPS);
+
+            //Scuffed Logic Here (Switch it)
+            if (disp < 2.5){
+                //powerShooterMotor(TPS);
+                shooterMotor.setVelocity(TPS);
+            }
+            else{
+                shooterMotor.setVelocity(constants.longTPS);
+                //powerShooterMotor(constants.longTPS);
+            }
+        }
+
+        public void aimBall(double disp, boolean z){
             angleRobot(disp);
             double TPS = getTPS(disp);
             //powerShooterMotor(TPS);
@@ -598,11 +646,10 @@ public class RobotData{
                 //shooterMotor.setVelocity(TPS);
             }
             else{
-                shooterMotor.setVelocity(constants.longTPS);
-                //powerShooterMotor(constants.longTPS);
+                //shooterMotor.setVelocity(constants.longTPS);
+                powerShooterMotor(constants.longTPS);
             }
         }
-
         public void telemetryArm(double disp){
             telemetry.addLine("Kinematics: \n");
 
@@ -630,9 +677,16 @@ public class RobotData{
             telemetry.addData("True Servo Angle:",convertDegToServo(getAngleTotal(disp)));
 
         }
+
+        public void quickTurn(double dir){
+
+            spinnerServo.setPower(dir);
+
+
+
+        }
     }
     public class Carosel{
-
         private Servo elevatorServo;
         private boolean elevatorTop;
         private DigitalChannel magneticLS;
@@ -644,14 +698,16 @@ public class RobotData{
         private String[] inventory;
         private CRServo intakeServo;
         private boolean intakeServoOn;
+        private boolean coolDownActive;
         //FailSafe Timers
         private ElapsedTime elevatorTimer;
         private ElapsedTime cycleTimer;
+        private ElapsedTime autoTimer;
+        private ElapsedTime cooldown;
+
 
         //Detection
         private String[] pattern;
-
-        //private String[] storage;
 
         //Cycling
         private int currentCaroselGlobalPos;
@@ -659,14 +715,19 @@ public class RobotData{
         private boolean cycleInProg;
         private boolean artifactDetected;
 
+        //----------------------------------------
+
         public Carosel(HardwareMap hardwareMap){
 
+            coolDownActive = false;
             artifactDetected = false;
             cycleInProg = false;
             currentCycle = 0;
             currentCaroselGlobalPos = 0;
             elevatorTimer = new ElapsedTime();
             cycleTimer = new ElapsedTime();
+            autoTimer = new ElapsedTime();
+            cooldown = new ElapsedTime();
 
             elevatorTop = false;
             elevatorServo = hardwareMap.get(Servo.class,"elevatorServo");
@@ -695,14 +756,15 @@ public class RobotData{
         //Intake
         //Could do boolean based or activation based (action based here)
 
-        public void powerIntakeServo(double power){
+        //----------------------------------------
 
-            intakeServo.setPower(power);
-        }
+        //Elevator
+
+
 
         public void shiftElevator(){
 
-            if (!elevatorTop){
+            if (!elevatorTop && !coolDownActive){
                 elevatorServo.setPosition(constants.ELEVATOR_TOP);
                 elevatorTop = true;
             }
@@ -714,16 +776,54 @@ public class RobotData{
 
         }
 
+        public int getCurrentElevatorPos(){
+            if (currentCycle == 2){
+                return 0;
+            }
+
+            else if (currentCycle == 1){
+                return 2;
+            }
+
+            else if (currentCycle == 0){
+                return 1;
+            }
+
+            return 0; //TODO Prevent crash
+        }
+
         public void ariseElevator(){
+            inventory[getCurrentElevatorPos()] = "Empty";
+            telemetry.addData("Inventory:",inventory[0] + inventory[1] + inventory[2]);
             elevatorServo.setPosition(constants.ELEVATOR_TOP);
             elevatorTop = true;
             elevatorTimer.reset();
+        }
+
+        public void deriseElevator(){
+            elevatorServo.setPosition(constants.ELEVATOR_BOT);
+            elevatorTop = false;
+            elevatorTimer.reset();
+        }
+
+        public void deriseElevatorPrimative(){
+            elevatorServo.setPosition(constants.ELEVATOR_BOT);
+            elevatorTop = false;
+            coolDownActive = false;
         }
 
         public void checkDeriseElevator(){
             if (elevatorTop && (elevatorTimer.milliseconds() > 1500 || isElevatorTop())){
                 elevatorServo.setPosition(constants.ELEVATOR_BOT);
                 elevatorTop = false;
+                coolDownActive = true;
+                cooldown.reset();
+            }
+        }
+
+        public void checkElevatorCD(){
+            if (coolDownActive && cooldown.milliseconds() > 1000){
+                coolDownActive = false;
             }
         }
 
@@ -731,13 +831,57 @@ public class RobotData{
             return elevatorBeam.getDistance(DistanceUnit.CM) < 5;
         }
 
+        private boolean elevatorAtRest(){
+            return touchSensor.getState();
+        }
+
+        //----------------------------------------
+
+        //Intake
+
+        public void powerIntakeServo(){
+            intakeServo.setPower(constants.INTAKE_POWER);
+            intakeServoOn = true;
+        }
         public void killIntakeServo(){
             intakeServo.setPower(constants.INTAKE_OFF);
             intakeServoOn = true;
         }
+        public void intakeArtifact(){
+
+            if (!intakeServoOn){
+                intakeServo.setPower(constants.INTAKE_POWER);
+                intakeServoOn = true;
+            }
+
+            else{
+                intakeServo.setPower(constants.INTAKE_OFF);
+                intakeServoOn = false;
+            }
+
+        }
+        public void ejectArtifact(){
+            if (intakeServoOn){
+                intakeServo.setPower(-constants.INTAKE_POWER);
+                intakeServoOn = false;
+            }
+
+            else{
+                intakeServo.setPower(constants.INTAKE_OFF);
+                intakeServoOn = true;
+            }
+        }
+        public void forceStopArtifact(){
+            intakeServo.setPower(constants.INTAKE_OFF);
+            intakeServoOn = true;
+        }
+
+        //----------------------------------------
+
+        //Carosel
 
         public void setCaroselPosition(int tick, Gamepad gamepad){
-            if (!elevatorTop){
+            if (!elevatorTop && !coolDownActive){
                 ElapsedTime temp = new ElapsedTime();
 
                 caroselMotor.setTargetPosition(tick);
@@ -762,178 +906,56 @@ public class RobotData{
             }
 
         }
-
-        private boolean checkIfEmptySpot(){
-            for (String i: inventory){
-                if (i.equals("Empty")){
-                    return true;
-                }
-            }
-            return false;
+        //Auto Cycle
+        public DcMotorEx getCaroselMotor(){
+            return caroselMotor;
         }
-
-        public void printInv(){
-            telemetry.addData("Inventory: ", inventory[0] + ", " + inventory[1] + ", " + inventory[2]);
-        }
-
         public void updateCaroselReaction(){
             if (detectedArtifact() && checkIfEmptySpot()){
                 artifactDetected = true;
                 startCycling(getClosestEmpty());
             }
         }
-
-        //purposely need to create a subzone
-
-        public boolean getArtifactDetected(){
-            return artifactDetected;
-        }
-
-//        public void cyclePositionalSpot(int pos, Gamepad gamepad){
-//
-//            currentCaroselPos = pos;
-//
-//            if (pos == 0){
-//                setCaroselPosition(constants.caroselPos[0], gamepad);
-//            }
-//
-//            else if (pos == 1){
-//                setCaroselPosition(constants.caroselPos[1], gamepad);
-//            }
-//
-//            else if (pos == 2){
-//                setCaroselPosition(constants.caroselPos[2], gamepad);
-//            }
-//
-//        }
-
         public void zeroCaroselMotor(){
             caroselMotor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
             currentCaroselGlobalPos = 0;
             currentCycle = 0;
         }
-
         public void incCaroselMotor(){
             currentCaroselGlobalPos += 5;
         }
-
         public void killCaroselMotor(){
             caroselMotor.setVelocity(0);
         }
 
-        private int getClosestEmpty(){
-
-            if (inventory[currentCycle].equals("Empty")){
-                return currentCycle;
-            }
-            else if (inventory[incrementCurrentPos(1)].equals("Empty")) {
-                return incrementCurrentPos(1);
-            }
-            else if (inventory[incrementCurrentPos(2)].equals("Empty")) {
-                return incrementCurrentPos(2);
-            }
-
-            return -1;
-
-        }
-
-        //For Manual Control
-
-        public int getCurrentCycle(){
-            return currentCycle;
-        }
-
-        private int getCycleError(int desiredCycle){
-
-            telemetry.addData("PosTESTTHIS",desiredCycle - currentCycle);
-            if (desiredCycle < currentCycle){
-
-                //Limited Case Structure
-                if (Math.abs(currentCycle - desiredCycle) == 1){
-                    return 2;
-                }
-
-                else{
-                    return 1;
-                }
-
-            }
-
-            else if (desiredCycle > currentCycle){
-                telemetry.addData("Pos1",desiredCycle - currentCycle);
-                return desiredCycle - currentCycle;
-            }
-
-            else{
-                return 0;
-            }
-        }
-
-//        public void cycleCarosel(int desiredCycle, Gamepad gamepad){
-//            if (!elevatorTop){
-//
-//                intakeServo.setPower(constants.INTAKE_POWER);
-//
-//                int error = getCycleError(desiredCycle);
-//
-//                currentCycle = desiredCycle;
-//                ElapsedTime temp = new ElapsedTime();
-//
-//                currentCaroselGlobalPos = constants.caroselIncrement * error + currentCaroselGlobalPos;
-//
-//                caroselMotor.setTargetPosition(currentCaroselGlobalPos);
-//                caroselMotor.setVelocity(1500);
-//                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
-//
-//                temp.reset();
-//
-//                while (caroselMotor.isBusy()){
-//
-//                    double time = temp.milliseconds();
-//
-//                    getDriveTrain().omniDrive(gamepad);
-//
-//                    if (time > 1000){
-//                        break;
-//                    }
-//
-//                }
-//
-//                caroselMotor.setVelocity(0);
-//
-//                intakeServo.setPower(constants.INTAKE_OFF);
-//            }
-//        }
-
-//        public void cycleInventory(int cycleNumber){
-//            for (int count = 0; count < cycleNumber; count++){
-//                String temp = inventory[2];
-//                inventory[2] = inventory[1];
-//                inventory[1] = inventory[0];
-//                inventory[0] = temp;
-//            }
-//        }
-
-        private void updateInventory(int desiredCycle){
-            inventory[desiredCycle] = getColorIntake();
+        public void telemetryCycle(){
+            telemetry.addData("Current Global: ", currentCaroselGlobalPos);
         }
 
         public void startCycling(int desiredCycle){
-            if (!elevatorTop){
+            if (!elevatorTop && !coolDownActive){
                 int error = getCycleError(desiredCycle);
-                updateInventory(currentCycle);
+                //updateInventory(currentCycle); //ToDO: Temp remove feature
                 currentCycle = desiredCycle;
                 //cycleInventory(error);
 
+                telemetry.addData("Error ", error);
                 currentCaroselGlobalPos = constants.caroselIncrement * error + currentCaroselGlobalPos;
-                telemetry.addData("Position Run To: ", currentCaroselGlobalPos);
 
                 caroselMotor.setTargetPosition(currentCaroselGlobalPos);
-                caroselMotor.setVelocity(500);
                 caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                caroselMotor.setVelocity(500);
 
                 cycleTimer.reset();
                 cycleInProg = true;
+            }
+        }
+
+        public void updateCaroselCycle(){
+            if (!elevatorTop && !coolDownActive){
+                caroselMotor.setTargetPosition(currentCaroselGlobalPos);
+                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                caroselMotor.setVelocity(500);
             }
         }
 
@@ -963,7 +985,6 @@ public class RobotData{
                 artifactDetected = false; //For Auto Aim ends subzone
             }
         }
-
         public int incrementCurrentPos(int inc){
 
             int nextPos = currentCycle + inc;
@@ -982,67 +1003,134 @@ public class RobotData{
             return nextPos;
 
         }
-
-        public void shootPattern(double disp, double angle){
-
-        }
         public void powerCaroselMotor(int power){
-            if (!elevatorTop){
+            if (!elevatorTop && !coolDownActive){
                 caroselMotor.setVelocity(power);
             }
         }
-
         public void killCaroselPower(){
             caroselMotor.setVelocity(0);
         }
 
-        private boolean elevatorAtRest(){
-            return touchSensor.getState();
-        }
+        //----------------------------------------
 
+        //Inventory
+
+        private boolean checkIfEmptySpot(){
+            for (String i: inventory){
+                if (i.equals("Empty")){
+                    return true;
+                }
+            }
+            return false;
+        }
+        public void printInv(){
+            telemetry.addData("Inventory: ", inventory[0] + ", " + inventory[1] + ", " + inventory[2]);
+        }
+        //        public void cyclePositionalSpot(int pos, Gamepad gamepad){
+//
+//            currentCaroselPos = pos;
+//
+//            if (pos == 0){
+//                setCaroselPosition(constants.caroselPos[0], gamepad);
+//            }
+//
+//            else if (pos == 1){
+//                setCaroselPosition(constants.caroselPos[1], gamepad);
+//            }
+//
+//            else if (pos == 2){
+//                setCaroselPosition(constants.caroselPos[2], gamepad);
+//            }
+//        }
+        public boolean getArtifactDetected(){
+            return artifactDetected;
+        }
+        private int getClosestEmpty(){
+
+            if (inventory[currentCycle].equals("Empty")){
+                return currentCycle;
+            }
+            else if (inventory[incrementCurrentPos(1)].equals("Empty")) {
+                return incrementCurrentPos(1);
+            }
+            else if (inventory[incrementCurrentPos(2)].equals("Empty")) {
+                return incrementCurrentPos(2);
+            }
+
+            return -1;
+
+        }
+        public int getCurrentCycle(){
+            return currentCycle;
+        }
+        private int getCycleError(int desiredCycle){
+
+            telemetry.addData("Error",desiredCycle - currentCycle);
+            if (desiredCycle < currentCycle){
+
+                //Limited Case Structure
+                if (Math.abs(currentCycle - desiredCycle) == 1){
+                    return 2;
+                }
+
+                else{
+                    return 1;
+                }
+
+            }
+
+            else if (desiredCycle > currentCycle){
+                telemetry.addData("Pos1",desiredCycle - currentCycle);
+                return desiredCycle - currentCycle;
+            }
+
+            else    {
+                return 0;
+            }
+        }
+        private void updateInventory(int desiredCycle){
+            inventory[desiredCycle] = getColorIntake();
+        }
         private boolean detectedArtifact(){
             float[] HSV = getHSV();
-
-            return csIntakeDist.getDistance(DistanceUnit.CM) < 3 || HSV[2] < 100;
+            //V
+            return csIntakeDist.getDistance(DistanceUnit.CM) < 3;
         }
+        public String getColorIntake() {
 
-        public void intakeArtifact(){
+            /*
+            //Purple
+            if (csIntake.red() > 100 && csIntake.blue() > 100){
+                return "Purple";
+            }
 
-            if (!intakeServoOn){
-                intakeServo.setPower(constants.INTAKE_POWER);
-                intakeServoOn = true;
+            //Green
+            else if (csIntake.green() > 100){
+                return "Green";
             }
 
             else{
-                intakeServo.setPower(constants.INTAKE_OFF);
-                intakeServoOn = false;
+                return null;
+            }
+             */
+            if (detectedArtifact()) {
+                float[] HSV = getHSV();
+
+                telemetry.addData("HSV", HSV[0] + "," + HSV[1] + "," + HSV[2]);
+
+                if (HSV[0] < 200){
+                    return "Green";
+                }
+
+                else if (HSV[0] >= 200){
+                    return "Purple";
+                }
+
             }
 
+            return "Empty";
         }
-
-        public void ejectArtifact(){
-            if (intakeServoOn){
-                intakeServo.setPower(-constants.INTAKE_POWER);
-                intakeServoOn = false;
-            }
-
-            else{
-                intakeServo.setPower(constants.INTAKE_OFF);
-                intakeServoOn = true;
-            }
-        }
-
-        public void forceStopArtifact(){
-            intakeServo.setPower(constants.INTAKE_OFF);
-            intakeServoOn = true;
-        }
-
-
-        //High (Sense Magnet) = true; reverse false
-        public boolean getMagnetState(){
-            return !magneticLS.getState();
-        }
-
         public float[] getHSV(){
 
             /*
@@ -1105,6 +1193,94 @@ public class RobotData{
 
 
         }
+        public ColorSensor getCS(){
+            return csIntake;
+        }
+
+        //----------------------------------------
+
+        //Shoot
+
+        public void shootPattern(double disp, double angle){
+
+        }
+
+        //----------------------------------------
+
+        //Magnet LS
+        public boolean getMagnetState(){
+            return !magneticLS.getState();
+        }
+
+        //----------------------------------------
+
+        //Pattern
+
+        public void updatePattern(String[] pattern){
+            this.pattern = pattern;
+        }
+
+        public void setInventoryAuto(){
+            inventory = new String[]{"Green","Purple","Purple"};
+        }
+
+        public int getElevatorPosition(int homePos){
+
+            //Lazy way out
+            if (homePos == 2){
+                return 1;
+            }
+
+            else if (homePos == 1){
+                return 0;
+            }
+
+            else if (homePos == 0){
+                return 2;
+            }
+
+            return - 1;
+        }
+
+
+        public void cyclePattern(int number){
+
+            int slot = getElevatorPosition(getInvPosition(pattern[number]));
+
+            if (slot == -1){
+                return;
+            }
+
+            startCycling(slot);
+            telemetry.addData("Inventory:",inventory[0] + inventory[1] + inventory[2]);
+            telemetry.addData("Cycle to:", pattern[number]);
+            telemetry.addData("Inv Pos:", getInvPosition(pattern[number]));
+        }
+
+        public int getInvPosition(String color){
+
+            int inventoryCount = 0;
+
+            for (String i: inventory){
+                if (i.equals(color)){
+                    return inventoryCount;
+                }
+                else{
+                    inventoryCount++;
+                }
+            }
+
+            return -1;
+        }
+
+        public void waitForMotor(){
+            autoTimer.reset();
+            while (autoTimer.milliseconds() < 3000){
+                telemetry.addLine("Waiting");
+                telemetry.update();
+            }
+
+        }
 
 //        private double getS(int red, int green, int blue){
 //
@@ -1113,49 +1289,6 @@ public class RobotData{
 //        private double getV(int red, int green, int blue){
 //
 //        }
-
-
-        public String getColorIntake() {
-
-            /*
-            //Purple
-            if (csIntake.red() > 100 && csIntake.blue() > 100){
-                return "Purple";
-            }
-
-            //Green
-            else if (csIntake.green() > 100){
-                return "Green";
-            }
-
-            else{
-                return null;
-            }
-             */
-            if (detectedArtifact()) {
-                float[] HSV = getHSV();
-
-                telemetry.addData("HSV", HSV[0] + "," + HSV[1] + "," + HSV[2]);
-
-                if (HSV[0] < 200){
-                    return "Green";
-                }
-
-                else if (HSV[0] >= 200){
-                    return "Purple";
-                }
-
-            }
-
-            return "Empty";
-        }
-
-
-
-        public ColorSensor getCS(){
-           return csIntake;
-        }
-
         /*
         public void cycleCarosel(double power, int numCycles){
 
@@ -1240,13 +1373,6 @@ public class RobotData{
 //
 //        }
 
-
-        //April Tag Read
-        public void updatePattern(String[] pattern){
-            this.pattern = pattern;
-        }
-
-
         //Pattern & Storage
 
         //Know Each COlor and Where they are (2d Array)
@@ -1283,8 +1409,52 @@ public class RobotData{
 //            }
 //        }
 
-        public void moveToStorageSpot(){
+        // For Manual Control
+//        public void cycleCarosel(int desiredCycle, Gamepad gamepad){
+//            if (!elevatorTop){
+//
+//                intakeServo.setPower(constants.INTAKE_POWER);
+//
+//                int error = getCycleError(desiredCycle);
+//
+//                currentCycle = desiredCycle;
+//                ElapsedTime temp = new ElapsedTime();
+//
+//                currentCaroselGlobalPos = constants.caroselIncrement * error + currentCaroselGlobalPos;
+//
+//                caroselMotor.setTargetPosition(currentCaroselGlobalPos);
+//                caroselMotor.setVelocity(1500);
+//                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+//
+//                temp.reset();
+//
+//                while (caroselMotor.isBusy()){
+//
+//                    double time = temp.milliseconds();
+//
+//                    getDriveTrain().omniDrive(gamepad);
+//
+//                    if (time > 1000){
+//                        break;
+//                    }
+//
+//                }
+//
+//                caroselMotor.setVelocity(0);
+//
+//                intakeServo.setPower(constants.INTAKE_OFF);
+//            }
+//        }
 
-        }
+//        public void cycleInventory(int cycleNumber){
+//            for (int count = 0; count < cycleNumber; count++){
+//                String temp = inventory[2];
+//                inventory[2] = inventory[1];
+//                inventory[1] = inventory[0];
+//                inventory[0] = temp;
+//            }
+//        }
+
+
     }
 }

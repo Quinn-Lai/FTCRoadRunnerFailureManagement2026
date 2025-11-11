@@ -1,19 +1,19 @@
-package org.firstinspires.ftc.teamcode.Autonomous;
+package org.firstinspires.ftc.teamcode.RobotV1.Autonomous;
 
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.robot.Robot;
 
-import org.firstinspires.ftc.teamcode.ClassData.AprilTagVision;
-import org.firstinspires.ftc.teamcode.ClassData.OpenCVData;
-import org.firstinspires.ftc.teamcode.ClassData.RoadRunnerData;
-import org.firstinspires.ftc.teamcode.ClassData.RobotData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.AprilTagVision;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RoadRunnerData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RobotData;
 import org.firstinspires.ftc.vision.opencv.ColorRange;
 
+@Disabled
 @Autonomous
 public class AutoMK2OpMode extends OpMode {
 
@@ -39,6 +39,8 @@ public class AutoMK2OpMode extends OpMode {
     public void init_loop(){
 
         //Color Selection & OpenCV
+
+        atVision.updateMotifCode();
 
         if (!(robotData.getOpenCVEnabled()) & robotData.isPendingColor()){
             robotData.selectedColor();
@@ -141,6 +143,8 @@ public class AutoMK2OpMode extends OpMode {
             atVision.telemetryAprilTag();
             telemetry.update();
         }
+
+
     }
 
     @Override

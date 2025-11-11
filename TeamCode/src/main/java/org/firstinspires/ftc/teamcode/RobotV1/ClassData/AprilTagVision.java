@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.ClassData;
+package org.firstinspires.ftc.teamcode.RobotV1.ClassData;
 
 /* Copyright (c) 2023 FIRST. All rights reserved.
  *
@@ -50,7 +50,6 @@ import java.util.List;
 public class AprilTagVision {
 
     private AprilTagProcessor aprilTag;
-
     private VisionPortal visionPortal;
     private HardwareMap hardwareMap;
     private WebcamName webcam;
@@ -62,12 +61,14 @@ public class AprilTagVision {
     private int idDesired;
     private String alliance;
 
+    //----------------------------------------
     public AprilTagVision(HardwareMap hardwareMap, Telemetry telemetry, String alliance){
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
         this.atHeight = 0.756015; //approximation 0.756015
 
         webcam = hardwareMap.get(WebcamName.class,"Webcam 1");
+        motifCode = null;
 
         if (alliance. equals("blue")){
             idDesired = 20;
@@ -78,6 +79,9 @@ public class AprilTagVision {
         this.alliance = alliance;
     }
 
+    //----------------------------------------
+
+    //Init
 
     public void updateAtHeight(double heightOfLauncher){
         atHeight -= heightOfLauncher;
@@ -142,14 +146,16 @@ public class AprilTagVision {
         //visionPortal.setProcessorEnabled(aprilTag, true);
 
     }
-
     public void activeVisionPortal(boolean active){
         visionPortal.setProcessorEnabled(aprilTag, active);
     }
-
     public void closeVisionPortal(){
         visionPortal.close();
     }
+
+    //----------------------------------------
+
+    //Telemetry
 
     public void telemetryAprilTag() {
 
@@ -179,6 +185,11 @@ public class AprilTagVision {
         }
     }
 
+    //----------------------------------------
+
+    //Vision Tower
+
+    //GLbal
     public boolean canSeeAT(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
@@ -191,7 +202,6 @@ public class AprilTagVision {
         //return !(currentDetections.isEmpty());
         return false;
     }
-
     public double getDisp(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
@@ -200,7 +210,7 @@ public class AprilTagVision {
 
         for (AprilTagDetection detection : currentDetections) {
             if (detection.id == idDesired){ //Red Blue
-                double range = detection.ftcPose.range * 100;
+                double range = detection.ftcPose.range/100;
 
                 //range^2 = height of apriltag^2 + xHorizontal^2
 
@@ -213,35 +223,6 @@ public class AprilTagVision {
         }
         return c;
     }
-
-    public void updateMotifCode(){ //Could possibly see oblisk and motif at the same time
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-
-        for (AprilTagDetection detection : currentDetections) {
-
-            if (detection.id == 21){
-                motifCode = new String[]{"G","P","P"};
-            }
-
-            else if (detection.id == 22){
-                motifCode = new String[]{"P","G","P"};
-            }
-
-            else if (detection.id == 23){
-                motifCode = new String[]{"P","P","G"};
-            }
-        }
-    }
-
-    public String[] getMotifCode(){
-
-        if (motifCode == null){
-            return new String[]{};
-        }
-
-        return motifCode;
-    }
-
     public double getYaw(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
@@ -257,7 +238,6 @@ public class AprilTagVision {
         return yaw;
 
     }
-
     public double getXPos(){
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
 
@@ -274,9 +254,49 @@ public class AprilTagVision {
 
     }
 
+    //----------------------------------------
+
+    //Vision Oblisk
+
+    public void updateMotifCode(){ //Could possibly see oblisk and motif at the same time
+        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
+
+        for (AprilTagDetection detection : currentDetections) {
+
+            if (detection.id == 21){
+                motifCode = new String[]{"Green","Purple","Purple"};
+            }
+
+            else if (detection.id == 22){
+                motifCode = new String[]{"Purple","Green","Purple"};
+            }
+
+            else if (detection.id == 23){
+                motifCode = new String[]{"Purple","Purple","Green"};
+            }
+        }
+    }
+    public String[] getMotifCode(){
+
+//        if (motifCode == null){
+//            return new String[]{"Empty","Empty","Empty"};
+//        }
+
+        return motifCode;
+    }
+
+    public boolean foundMotif(){
+        return motifCode != null;
+    }
+
+    //----------------------------------------
+
+    //Misc
+
     public String getAlliance(){
         return alliance;
     }
 
+    //----------------------------------------
 }
 

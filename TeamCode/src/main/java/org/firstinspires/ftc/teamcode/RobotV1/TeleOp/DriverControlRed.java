@@ -1,12 +1,14 @@
-package org.firstinspires.ftc.teamcode.TeleOp;
+package org.firstinspires.ftc.teamcode.RobotV1.TeleOp;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.ClassData.AprilTagVision;
-import org.firstinspires.ftc.teamcode.ClassData.RoadRunnerData;
-import org.firstinspires.ftc.teamcode.ClassData.RobotData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.AprilTagVision;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RoadRunnerData;
+import org.firstinspires.ftc.teamcode.RobotV1.ClassData.RobotData;
 
+@Disabled
 @TeleOp
 public class DriverControlRed extends OpMode {
 
@@ -81,6 +83,14 @@ public class DriverControlRed extends OpMode {
 
         if (robotData.getDriveTrain().getCurrentMode()){
 
+            if (gamepad1.dpadDownWasPressed()){
+                robotData.getTurret().reverseShooterMotor();
+            }
+
+            else if (gamepad1.dpadUpWasPressed()){
+                robotData.getTurret().unreverseShooterMotor();
+            }
+
             //Toggle Motors & Aim
             if (gamepad1.circleWasPressed()){
                 robotData.getTurret().switchTurretMode();
@@ -92,6 +102,10 @@ public class DriverControlRed extends OpMode {
                     robotData.getTurret().aimBall(atVision.getDisp());
                     robotData.updateTelemetry(telemetry);
                     robotData.getTurret().telemetryArm(atVision.getDisp());
+                }
+                else{
+                    robotData.getTurret().aimBall(1.7901);
+                    telemetry.addLine("Eyes Closed");
                 }
             }
             else{
@@ -107,7 +121,7 @@ public class DriverControlRed extends OpMode {
             }
 
             //Auto Sort & Inventory
-            robotData.getCarosel().updateCaroselReaction();
+            //robotData.getCarosel().updateCaroselReaction();
 
             //Subzone when it detects something
             while (robotData.getCarosel().getArtifactDetected()){
@@ -127,13 +141,9 @@ public class DriverControlRed extends OpMode {
 
             //Cycle Carosel
 
-            if (gamepad1.squareWasPressed()){
-                robotData.getCarosel().startCycling(robotData.getCarosel().incrementCurrentPos(1));
-            }
-            robotData.getCarosel().checkCycleEnd();
-
-            if (gamepad1.optionsWasPressed()){
+            if (gamepad1.touchpadWasPressed()){
                 robotData.getCarosel().incCaroselMotor();
+                robotData.getCarosel().startCycling(robotData.getCarosel().getCurrentCycle());
             }
 
             if (gamepad1.dpad_left){
@@ -144,6 +154,26 @@ public class DriverControlRed extends OpMode {
             }
             else{
                 robotData.getTurret().killSpinnerServo();
+            }
+
+            if (gamepad1.optionsWasPressed()){
+                robotData.getTurret().switchTurretMode();
+            }
+
+            else if (gamepad1.circleWasPressed()){
+                robotData.getTurret().switchTurretManualClose();
+            }
+
+            if (robotData.getTurret().isToggleTurretAim()){
+                robotData.getTurret().aimBall(3);
+            }
+
+            else if (robotData.getTurret().isToggleTurretManualClose()){
+                robotData.getTurret().aimBall(1.7);
+            }
+
+            else{
+                robotData.getTurret().killShooterPower();
             }
 
         }
@@ -157,11 +187,20 @@ public class DriverControlRed extends OpMode {
             robotData.getCarosel().ariseElevator();
         }
         robotData.getCarosel().checkDeriseElevator();
+        robotData.getCarosel().checkElevatorCD();
 
         //Intake
         if (gamepad1.crossWasPressed()){
             robotData.getCarosel().intakeArtifact();
         }
+
+        if (gamepad1.squareWasPressed()){
+            robotData.getCarosel().startCycling(robotData.getCarosel().incrementCurrentPos(1));
+        }
+
+        robotData.getCarosel().updateCaroselCycle();
+
+        robotData.getCarosel().checkCycleEnd();
 
         //-----------------------------------------------------
 
@@ -191,6 +230,7 @@ public class DriverControlRed extends OpMode {
         telemetry.addData("Yaw", atVision.getYaw());
         telemetry.addData("Color Detected", robotData.getCarosel().getColorIntake());
         telemetry.addData("X: ", atVision.getXPos());
+        robotData.getCarosel().telemetryCycle();
 
         telemetry.addData("RGB", robotData.getCarosel().getCS().red() + "," + robotData.getCarosel().getCS().green() + "," + robotData.getCarosel().getCS().blue());
         telemetry.addData("HSV",  robotData.getCarosel().getHSV()[0] + "," + robotData.getCarosel().getHSV()[1] + "," + robotData.getCarosel().getHSV()[2]);
