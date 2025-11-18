@@ -8,35 +8,31 @@ import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.teamcode.RobotV2.ClassData.LimeLightVision;
 
 @TeleOp
 public class LimelightTest extends LinearOpMode {
 
-    private Limelight3A limelight;
-    //private IMU imu;
+    private LimeLightVision limelight;
 
     @Override
     public void runOpMode() throws InterruptedException
     {
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        //imu = hardwareMap.get(IMU.class,"imu");
-
-        telemetry.setMsTransmissionInterval(11);
-
-        limelight.pipelineSwitch(0);
+        limelight = new LimeLightVision(hardwareMap, telemetry, "blue");
 
         waitForStart();
 
-        limelight.start();
+        limelight.initLimeLight();
 
         while (opModeIsActive()) {
             //YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
             //limelight.updateRobotOrientation(orientation.getYaw(AngleUnit.DEGREES));
 
-            LLResult result = limelight.getLatestResult();
-            if (result != null && result.isValid()) {
-                telemetry.addData("tx", result.getTx());
-                telemetry.addData("ty", result.getTy());
+            if (limelight.getResults() != null && limelight.getResults().isValid()) {
+                telemetry.addData("tx", limelight.getTx());
+                telemetry.addData("ty", limelight.getTy()); //TODO test multiple april tags
+                telemetry.addData("ty deg", limelight.getTyFidDeg());
+                telemetry.addData("Displacement: ", limelight.getDisp());
             }
 
             telemetry.update();
