@@ -23,58 +23,44 @@ import org.firstinspires.ftc.vision.opencv.ColorRange;
 
 import java.util.Arrays;
 
-//import kotlin.random.FallbackThreadLocalRandom;
-
-
-//Class to Organize each robot part and store the objects of each part of the robot
-//Should be imported into RoadRunnerData to utilize each component
 public class RobotDataV2 {
+
+    /** Components */
     private HardwareMap hardwareMap;
     private Telemetry telemetry;
-    private static ColorRange startColor;
-    private static boolean startedLeft;
     private static ElapsedTime runtime;
-    private ElapsedTime delay;
+
+    /** Auto Status */
     private boolean pendingColor;
     private boolean pendingPosition;
 
-    //Sub Classes
+    /** Main Classes */
     private DriveTrain driveTrain;
     private Turret turret;
     private Carosel carosel;
-    private AprilTagVisionV2 atData;
-    //OpenCV
+    private LimeLightVision limeLight;
+
+    /** Open CV */
     private boolean openCVEnabled;
 
     //----------------------------------------
 
-    //Constructor
-    public RobotDataV2(HardwareMap hardwareMap, Telemetry telemetry, AprilTagVisionV2 atData){
-
-        //OpenCV
-        //startColor = ColorRange.RED; //Default in Case Auto Wasn't Run First
-
-        //Turret
+    /** Constructor */
+    public RobotDataV2(HardwareMap hardwareMap, Telemetry telemetry, LimeLightVision limeLight){
 
         this.hardwareMap = hardwareMap;
+        this.telemetry = telemetry;
+
         turret = new Turret(hardwareMap);
         carosel = new Carosel(hardwareMap);
         driveTrain = new DriveTrain(hardwareMap);
-
-        this.atData = atData;
-        this.telemetry = telemetry;
-        delay = new ElapsedTime();
-
-        //Intake
-
-        //Carosel
-
+        this.limeLight = limeLight;
         runtime = null;
     }
 
     //----------------------------------------
 
-    //Main Sub Classes
+    /** Main Classes */
 
     public Carosel getCarosel(){
         return carosel;
@@ -86,8 +72,7 @@ public class RobotDataV2 {
         return turret;
     }
 
-    //----------------------------------------
-
+    /** Components */
 
     public static void createRuntime(){
         runtime = new ElapsedTime();
@@ -102,36 +87,20 @@ public class RobotDataV2 {
     public boolean getOpenCVEnabled() {
         return openCVEnabled;
     }
-    public void setOpenCVEnabled(boolean openCVEnabled) {
-        this.openCVEnabled = openCVEnabled;
-    }
-    public static ColorRange getStartColor() {
-        return startColor;
-    }
-
-    public static void setStartColor(ColorRange color) {
-        startColor = color;
-    }
-    public static boolean getStartedLeft() {
-        return startedLeft;
-    }
-    public static void setStartedLeft(boolean left) {
-        startedLeft = left;
-    }
-    public static String getStartingPosition(){
-        if (startedLeft){
-            return "Left Side";
-        }
-        else{
-            return "Right Side";
-        }
-    }
     public HardwareMap getHardwareMap() {
         return hardwareMap;
     }
     public void setHardwareMap(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
     }
+    public void updateTelemetry(Telemetry telemetry){
+        this.telemetry = telemetry;
+    }
+    public boolean isBusy(DcMotorEx motor){
+        return Math.abs(motor.getCurrentPosition() - motor.getTargetPosition()) > RobotConstantsV2.MOTOR_TOLERENCE;
+    }
+
+    /** Auto Status */
     public boolean isPendingColor(){
         return pendingColor;
     }
@@ -144,37 +113,36 @@ public class RobotDataV2 {
     public void selectedPosition(){
         pendingPosition = false;
     }
-    public void delayOrder(int delay) {
-        this.delay.reset();
-        while (this.delay.milliseconds() < delay) {
-            getDriveTrain().omniDrive();
-        }
-    }
-    public void updateTelemetry(Telemetry telemetry){
-        this.telemetry = telemetry;
-    }
 
     //----------------------------------------
 
     public class DriveTrain{
 
-        //Drive Train
+        /** Drive Train */
         private DcMotor LFmotor;
         private DcMotor RFmotor;
         private DcMotor LBmotor;
         private DcMotor RBmotor;
 
-        //Sensors
+        /** Sensors */
         private IMU imu;
 
-        //Driver
+        /** Driver Status */
         private boolean robotCentric;
-        private Gamepad mode;
-        private String tag;
-        private boolean defaultToAutoAim;
+        private Gamepad driver;
+
+        /** Modes */
+        private String currentMode;
+        private String currentSubMode;
+
+        //----------------------------------------
+
+        /** Constructor */
 
         public DriveTrain(HardwareMap hardwareMap){
-            //Basic Motors
+
+            /** Init Hardware */
+
             LFmotor  = hardwareMap.get(DcMotor.class, "LFmotor");
             RFmotor = hardwareMap.get(DcMotor.class, "RFmotor");
             LBmotor = hardwareMap.get(DcMotor.class, "LBmotor");
@@ -190,74 +158,62 @@ public class RobotDataV2 {
             LFmotor.setDirection(DcMotor.Direction.REVERSE);
             LBmotor.setDirection(DcMotor.Direction.REVERSE);
 
+            /** Init Starting Statuses */
+
             robotCentric = true;
             openCVEnabled = false;
             pendingColor = true;
             pendingPosition = true;
-            defaultToAutoAim = true;
 
+            currentMode = RobotConstantsV2.mainModes[0];
+            currentSubMode = RobotConstantsV2.subModes[2];
+
+            /** Field Centric */
             if (!robotCentric){
                 imu = hardwareMap.get(IMU.class, "imu");
                 IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                        RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                        RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+                        RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                        RevHubOrientationOnRobot.UsbFacingDirection.UP));
                 imu.initialize(parameters);
             }
         }
 
         //----------------------------------------
 
-        //Mode
+        /** Gamepad */
+        public void setGamepad(Gamepad driver) {
+            this.driver = driver;
+        }
 
-        public Gamepad getMode() {
-            return mode;
-        }
-        public String getTag(){
-            return tag;
-        }
-        public void setMode(Gamepad mainDriver, String tag) {
-
-            //Only Changes Drivers if the person trying to swap isn't already the main driver
-            //if (!(this.mainDriver.equals(mainDriver))){
-            //this.subDriver = this.mainDriver;   //current main driver becomes P2
-            this.mode = mainDriver;       //new main driver becomes selected player
-            this.tag = tag;
-            this.mode.setLedColor(0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
-            //this.subDriver.setLedColor(0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
-            //}
-        }
+        /** Main Modes */
         public void switchMode(){
-
-            if (defaultToAutoAim){
-                defaultToAutoAim = false;
-            }
-
-            else{
-                defaultToAutoAim = true;
-            }
+            if (currentMode.equals(RobotConstantsV2.mainModes[0])) currentMode = RobotConstantsV2.mainModes[1];
+            else currentMode = RobotConstantsV2.mainModes[0]; //Default to Auto Mode (Even if humanIntake)
         }
-        public boolean getCurrentMode(){
-            return defaultToAutoAim;
+        public void switchHumanIntake(){
+            currentMode = RobotConstantsV2.mainModes[2];
         }
-        public void updateModeColor(){
-            if (defaultToAutoAim){
-                    mode.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
-
-                }
-            else{
-                    mode.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
-                }
+        public String getCurrentMode(){
+            return currentMode;
         }
 
-        //----------------------------------------
+        /** Sub Modes */
+        public String getCurrentSubMode(){
+            return currentSubMode;
+        }
+        public void requestRapidFire(){
+            currentSubMode = RobotConstantsV2.subModes[0];
+        }
+        public void requestSortedFire(){
+            currentSubMode = RobotConstantsV2.subModes[1];
+        }
 
-        //DT
-
+        /** Movement */
         public void omniDrive(){
 
-            double x = mode.left_stick_x;
-            double y = -mode.left_stick_y;
-            double z = mode.right_stick_x;
+            double x = driver.left_stick_x;
+            double y = -driver.left_stick_y;
+            double z = driver.right_stick_x;
 
             //Robot POV
             if (robotCentric){
@@ -318,58 +274,92 @@ public class RobotDataV2 {
                 RFmotor.setPower(frontRightPower);
                 RBmotor.setPower(backRightPower);
             }
+            //Field POV
+            else{
+                double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+
+                // Rotate the movement direction counter to the bot's rotation
+                double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+                double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+
+                rotX *= 1.1;
+
+                double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(z), 1);
+                double frontLeftPower = (rotY + rotX + z) / denominator;
+                double backLeftPower = (rotY - rotX + z) / denominator;
+                double frontRightPower = (rotY - rotX - z) / denominator;
+                double backRightPower = (rotY + rotX - z) / denominator;
+
+                LFmotor.setPower(frontLeftPower);
+                LBmotor.setPower(backLeftPower);
+                RFmotor.setPower(frontRightPower);
+                RBmotor.setPower(backRightPower);
+            }
         }
 
-        //----------------------------------------
-
-        //Feedback
-
+        /** Final Updates */
+        public void updateModeColor(){
+            if (currentMode.equals(RobotConstantsV2.mainModes[0])){
+                driver.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
+            }
+            else if (currentMode.equals(RobotConstantsV2.mainModes[1])){
+                driver.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
+            }
+            else{
+                driver.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
+            }
+        }
         public void checkEndgame(){
             double currentRuntime = getRuntime();
 
             if (currentRuntime >= 90 && currentRuntime <= 92){
-                mode.rumble(2);
-                mode.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
+                driver.rumble(2);
                 telemetry.addLine("END GAME!");
             }
 
             else if (currentRuntime >= 110 && currentRuntime <= 120){
-                mode.rumble(2);
+                driver.rumble(2);
                 double time = 120 - currentRuntime;
+                telemetry.addLine("END GAME!");
                 telemetry.addLine(Math.floor(time) + " Seconds Left!");
             }
         }
-        public void displayTelemetryData(){
+        public void telemetryDriveTrain(){
             telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
-            telemetry.addData("Main Driver: ", tag);
+            telemetry.addData("Current Mode: ", currentMode);
+            telemetry.addData("Current Sub Mode: ", currentSubMode);
         }
 
-        //----------------------------------------
-
-        //Misc
 
         public DcMotor getLFmotor(){
             return LFmotor;
-        }
-
-        //----------------------------------------
+        } //TODO Temporarily To Test Auto Park
 
     }
+
+    //----------------------------------------
+
     public class PIDControl{
+
+        /** Constants */
         private double kP = 6.7;
         private double kI = 0.53;
         private double kD = 0.3;
+        private double kF = 0;
+
+        /** Utility */
         private ElapsedTime PIDTimer = new ElapsedTime();
         private double integralSum = 0;
         private double lastError = 0;
-        public String getPIDCos(){
-            return kP + ", " + kI + ", " + kD;
-        }
 
         //----------------------------------------
 
-        //PID
+        /** Constants */
+        public String getPIDCos(){
+            return String.format("kP: %f, kI: %f, kD: %f, kF: %f", kP, kI, kD, kF);
+        }
 
+        /** PID */
         public double PIDShooter(double current, double desired) {
 
             double currentTime = PIDTimer.seconds();
@@ -386,97 +376,57 @@ public class RobotDataV2 {
 
             PIDTimer.reset();
 
-            output = (error * kP) + (derivate * kD) + (integralSum * kI);
+            output = (error * kP) + (derivate * kD) + (integralSum * kI) + (desired * kF);
 
             return output;
-        }
-    }
+        } //TODO Tune this
+    } //TODO Update Tester File
+
+    //----------------------------------------
+
     public class Turret extends PIDControl{
 
-        //Motors
+        /** Parts */
         public DcMotorEx shooterMotor;
         private Servo shooterServo;
 
-        //Physics Params
+        /** Physics Parameters */
         private final double a = -9.8; //Acceleration m/s^2
-        public double heightOfLauncher = 0.3556; //Meters, need compensate for height of launcher
+        public double heightOfLauncher = 0.3556; //TODO Update this
         private final double height = 1.2 - heightOfLauncher; //Meters 1.05
         private final double vY = Math.sqrt(2 * -a * height);
         private double vX = 0;
         private double vX0 = 0; //initial vX of the robot at an instant in time
 
-        //Motor Params
+        /** Fly Wheel */
         private final double spinWheelRadius = 0.096/2; //Meters
         private final double w = 28.0; //Ticks
-        private boolean toggleTurretAim;
-        private boolean toggleTurretManualClose;
 
-        private ElapsedTime scrimTimerAuto;
-//        private final double dragX = 1.67;
-//        private final double dragY = 1.1;
+        /** Toggle Turret */
+        private boolean toggleTurretAim;
+        private boolean isFar;
 
         //----------------------------------------
 
+        /** Constructor */
         private Turret(HardwareMap hardwareMap){
-            scrimTimerAuto = new ElapsedTime();
 
-            shooterMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotor"); //temp
+            /** Hardware Init */
+            shooterMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotor");
+            shooterServo = hardwareMap.get(Servo.class,"shooterServo");
+
             shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             shooterMotor.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
 
-            shooterServo = hardwareMap.get(Servo.class,"shooterServo");
+            /** Mode Init */
             toggleTurretAim = false;
-            toggleTurretManualClose = false;
-
+            isFar = false;
         }
 
         //----------------------------------------
 
-        //Turret Mode
-
-        public void switchTurretMode(){
-            if (toggleTurretAim){
-                toggleTurretAim = false;
-                toggleTurretManualClose = false;
-            }
-
-            else{
-                toggleTurretAim = true;
-                toggleTurretManualClose = false;
-            }
-        }
-        public boolean isToggleTurretAim(){
-            return toggleTurretAim;
-        }
-
-        public void switchTurretManualClose(){
-            if (toggleTurretManualClose){
-                toggleTurretManualClose = false;
-                toggleTurretAim = false;
-            }
-
-            else{
-                toggleTurretManualClose = true;
-                toggleTurretAim = false;
-            }
-        }
-        public boolean isToggleTurretManualClose(){
-            return toggleTurretManualClose;
-        }
-
-        public void reverseShooterMotor(){
-            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-        }
-
-        public void unreverseShooterMotor(){
-            shooterMotor.setDirection(DcMotor.Direction.FORWARD);
-        }
-
-        //----------------------------------------
-
-        //Physics Calculations
+        /** Physics Calculations */
 
         private double getYEquation(double time){
             return vY * time + 0.5 * a * Math.pow(time, 2);
@@ -487,9 +437,8 @@ public class RobotDataV2 {
         public double getHeightOfLauncher(){
             return heightOfLauncher;
         }
-
-        //Using the formula -b/2a, SAME THING as derivative of position equation and the vf = vi + at equation
         private double getTimeExtrema(){
+            //Using the formula -b/2a, SAME THING as derivative of position equation and the vf = vi + at equation
             return -vY/a; //2's cancel
         }
         private double getVy(){
@@ -502,7 +451,7 @@ public class RobotDataV2 {
             return ((disp / getTimeExtrema()) + vX0);
         }
         private double getVelocityTotal(double disp){
-            return Math.sqrt(Math.pow(getVy(),2) + Math.pow(getVx(disp),2)) * RobotConstantsV2.yDrag;
+            return Math.sqrt(Math.pow(getVy(),2) + Math.pow(getVx(disp),2)); //TODO Removed Velocity Drag Multiplier and moved to ticks
         }
         private double getAngleTotal(double disp){
             return Math.atan2(getVy(),getVx(disp)) * (180 / Math.PI);
@@ -520,93 +469,91 @@ public class RobotDataV2 {
             return w;
         }
         private double getTPS(double disp){ //From Radians per Second
-            return (getRadiansPerSecond(disp) * getW()) / (2 * Math.PI);
+            return ((getRadiansPerSecond(disp) * getW()) / (2 * Math.PI)) * RobotConstantsV2.dragMultiplier;
         }
 
-        //----------------------------------------
+        /** Toggle Turret Modes */
+        public void switchTurretMode(){
+            if (toggleTurretAim) toggleTurretAim = false;
+            else toggleTurretAim = true;
+        }
+        public boolean isToggleTurretAim(){
+            return toggleTurretAim;
+        }
+        public void switchTurretFar(){
+            if (isFar) isFar = false;
+            else isFar = true;
+        }
+        public boolean isFarToggled(){
+            return isFar;
+        }
 
-        //Shooter
+        /** Human Player Intake Mode */
+        public void activateHumanIntakeMode(){
+            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+            powerShooterMotor(RobotConstantsV2.HUMAN_INTAKE_SPEED);
+        }
+        public void deactivateHumanIntakeMode(){
+            shooterMotor.setDirection(DcMotor.Direction.FORWARD);
+        }
 
+        /** Fly Wheel Power */
         public void powerShooterMotor(double TPS){
-
-            double leftCurrent = shooterMotor.getVelocity();
-
-            shooterMotor.setVelocity(PIDShooter(leftCurrent,TPS));
+            double current = shooterMotor.getVelocity();
+            shooterMotor.setVelocity(PIDShooter(current,TPS));
+        }
+        public void killShooter(){
+            shooterMotor.setVelocity(RobotConstantsV2.KILL_SHOOTER_SPEED);
         }
 
-        public void killShooterPower(){
-            shooterMotor.setVelocity(0);
-        }
-
-        //----------------------------------------
-
-        //Hood Angle
-
+        /** Hood */
         private double convertDegToServo(double angle){
             return -0.031506 * angle + 1.99244;
         }
         public void angleRobot(double disp){
-
-            //double desiredAngle = getAngleTotal(disp)+15;
-            double desiredAngle = getAngleTotal(disp) + 15;
+            double desiredAngle = getAngleTotal(disp) + RobotConstantsV2.ANGLE_BONUS;
             shooterServo.setPosition(convertDegToServo(desiredAngle));
-
-            //Servo Movement
-
-            //servo.setPosition(convertDegToServo(desiredAngle));
-
         }
 
-        //----------------------------------------
-
-        //Misc
+        /** Final Shot */
         public void aimBall(double disp){
             angleRobot(disp);
             double TPS = getTPS(disp);
-            //powerShooterMotor(TPS);
 
-            //Scuffed Logic Here (Switch it)
-            if (disp < 2.5){
-                //powerShooterMotor(TPS);
-                shooterMotor.setVelocity(TPS);
-            }
-            else{
-                shooterMotor.setVelocity(RobotConstantsV2.longTPS);
-                //powerShooterMotor(constants.longTPS);
-            }
-        }
-
-        public void aimBall(double disp, boolean z){
-            angleRobot(disp);
-            double TPS = getTPS(disp);
-            //powerShooterMotor(TPS);
-
-            //Scuffed Logic Here (Switch it)
             if (disp < 2.5){
                 powerShooterMotor(TPS);
                 //shooterMotor.setVelocity(TPS);
             }
             else{
-                //shooterMotor.setVelocity(constants.longTPS);
-                powerShooterMotor(RobotConstantsV2.longTPS);
+                //powerShooterMotor(RobotConstantsV2.FAR_TPS); //TODO Separted On Purpose
+                powerShooterMotor(TPS); //TODO Test if can use far default or if camera can pick up
+                //shooterMotor.setVelocity(RobotConstantsV2.longTPS);
             }
         }
-        public void telemetryArm(double disp){
+
+        /** Final Updates */
+        public void telemetryTurretBasic(){
+            telemetry.addData("Turret On: ", toggleTurretAim);
+            telemetry.addData("Close Shot: ", !isFar);
+        }
+        private double getTPSError(double disp){
+            return shooterMotor.getVelocity() - getTPS(disp);
+        }
+        public void telemetryTurret(double disp){
             telemetry.addLine("Kinematics: \n");
 
             telemetry.addData("Total Velocity: ", getVelocityTotal(disp));
             telemetry.addData("vY: ", getVy());
             telemetry.addData("vX: ",getVx(disp));
             telemetry.addData("vX0: ", getInitalVelocityX());
-            telemetry.addData("Drag Vx: ", RobotConstantsV2.xDrag);
-            telemetry.addData("Drag Vy: ", RobotConstantsV2.yDrag);
+            telemetry.addData("Estimated Drag Multiplier: ", RobotConstantsV2.dragMultiplier);
             telemetry.addLine("-------------------------- \n");
 
             telemetry.addLine("TPS: \n");
 
             telemetry.addData("True TPS: ", shooterMotor.getVelocity());
             telemetry.addData("Ticks Per Second: ", getTPS(disp));
-            telemetry.addData("TPS Error:", shooterMotor.getVelocity() - getTPS(disp));
+            telemetry.addData("TPS Error:", getTPSError(disp));
 
             telemetry.addLine("-------------------------- \n");
 
@@ -619,32 +566,37 @@ public class RobotDataV2 {
 
         }
     }
+
+    //----------------------------------------
+
     public class Carosel{
 
-        //Hardware
+        /** Hardware */
         private DcMotorEx intakeMotor;
         private DcMotorEx caroselMotor;
         private Servo transferServo;
+
+
+        /** Sensors */
         private Servo indicatorOne;
         private Servo indicatorTwo;
         private DigitalChannel magLS;
         private ColorSensor colorSensor;
         private DistanceSensor colorSensorDist;
         private DistanceSensor transferBeam;
+        private DistanceSensor intakeBeam;
 
-        //Storage
+        /** Storage */
         private String[] inventory;
         private String[] pattern;
         private int currentCycle;
 
-        //Intake
+        /** Carosel Booleans */
         private boolean intakeMotorOn;
-
-        //Transfer
         private boolean transferUp;
 
-        //Modes
-        private boolean rapidFireOn;
+        /** Transfer & Shoot */
+        private int sortedFireQueue;
         private boolean shotInProg;
         private boolean transferCooldownActive;
         private ElapsedTime transferCooldown;
@@ -652,49 +604,47 @@ public class RobotDataV2 {
 
         //----------------------------------------
 
+        /** Constructor */
         public Carosel(HardwareMap hardwareMap){
+
+            /** Hardware Init */
 
             intakeMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"intakeMotor");
             caroselMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"caroselMotor");
             transferServo = hardwareMap.get(Servo.class,"transferServo");
-
             indicatorOne = hardwareMap.get(Servo.class,"indicatorOne");
             indicatorTwo = hardwareMap.get(Servo.class,"indicatorTwo");
-
             magLS = hardwareMap.get(DigitalChannel.class,"magLS");
             colorSensor = hardwareMap.get(ColorSensor.class,"colorSensor");
             colorSensorDist = hardwareMap.get(DistanceSensor.class,"colorSensor");
-
             transferBeam = hardwareMap.get(DistanceSensor.class,"transferBeam");
+            intakeBeam = hardwareMap.get(DistanceSensor.class,"intakeBeam");
 
+            /** Spindex */
             inventory = new String[]{"Empty","Empty","Empty"};
             pattern = new String[]{"Empty","Empty","Empty"};
 
-            //Boolean Standardization
+            /** Variable Init */
 
             intakeMotorOn = false;
-            rapidFireOn = false;
             transferUp = false;
             shotInProg = false;
             transferCooldownActive = false;
 
             transferCooldown = new ElapsedTime();
-            availableShots = 0;
 
+            availableShots = 0;
+            sortedFireQueue = 0;
         }
 
         //----------------------------------------
 
-        //Autonomous
+        /** Autonomous */
         public void setInventoryAuto(){
             inventory = new String[]{"Green","Purple","Purple"};
         }
 
-
-        //----------------------------------------
-
-        //Intake
-
+        /** Intake */
         public void intakeArtifact(){
             if (!intakeMotorOn){
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_ON);
@@ -714,227 +664,30 @@ public class RobotDataV2 {
             intakeMotorOn = false;
         }
 
-        //----------------------------------------
-
-        //General Use
+        /** Pattern */
         public void updatePattern(String[] pattern){
             this.pattern = pattern;
         }
         private boolean hasPattern() {
-            return Arrays.equals(inventory,pattern);
-        }
 
-        //----------------------------------------
+            String[] tempArrayInventory = inventory;
+            String[] tempArrayPattern = pattern;
 
-        //Spindex
-//TODO Add human intake feature
-        public void activateRapidFire(){
-            updateAvailableShots();
-            rapidFireOn = true;
-        }
-        public boolean isRapidFireOnMode(){
-            return rapidFireOn;
-        } //TODO Reverse if Automatic
-        private void checkForShotOpportunity(){
-            if (isCaroselInPlace() && rapidFireOn && !shotInProg && isReadyShoot()){ //TODO There is nothing to prevent an accdiental mag ls read from killing everything
-                forceTransferUp();
-                shotInProg = true;
-            }
-        }
-        private void checkResetTransfer(){
-            if (shotInProg && isShotSuccess()){
-                forceTransferDown();
-                shotInProg = false;
-                transferCooldownActive = true;
-                transferCooldown.reset();
-            }
-        }
-        private void checkEndShotCoolDown(){
-            if (!shotInProg && transferCooldownActive && transferCooldown.milliseconds() > RobotConstantsV2.COOLDOWN_SHOT){
-                transferCooldownActive = false;
-            }
-        }
-        //TODO Currently Cycling has wrapping, might need to implement hold system -_- for shortest path
-        //Mode
-        public void cycleRapid(){
-            if (rapidFireOn) { //TODO Use case switch here
+            Arrays.sort(tempArrayInventory);
+            Arrays.sort(tempArrayPattern);
 
-                //Activates once if shots are available to shoot
-                //Won't Cycle or Update Coutner if the robot has just shot something
-                //Will only cycle if its empty at shooter spot
-                //WILL NOT SPIN until the magnetic limit switch in in place (prevent skipping)
-                //TODO Could still skip if mid spin it detects something, could try is busy but that is buggy
-                if (availableShots > 0 && !shotInProg && !isReadyShoot() && isCaroselInPlace() && !caroselMotor.isBusy()){//TODO Might not work
-                    cycleCarosel(getNextCycle());
-                    updateAvailableShots(); //TODO SLightly more inefficent but good for redundency
-                }
-
-                else{
-                    rapidFireOn = false;
-                }
-
-                checkForShotOpportunity();
-                checkResetTransfer();
-                checkEndShotCoolDown();
-            }
-        }
-
-        public void cycleCarosel(int desiredCycle){
-            if (!transferCooldownActive && !shotInProg){
-                updateInventory();
-                currentCycle = desiredCycle;
-
-                caroselMotor.setTargetPosition(RobotConstantsV2.caroselPos[desiredCycle]);
-                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
-                caroselMotor.setVelocity(2400);
-            }
-        }
-        public void cyclePattern(int number){
-            int slot = getInvPosition(pattern[number]);
-
-            if (slot == -1){
-                return;
-            }
-
-            cycleCarosel(slot);
-        }
-
-        //TODO Rapid Fire and pattern fire
-
-        //----------------------------------------
-
-        //Inventory
-
-        private void updateAvailableShots(){
-
-            int shotCounter = 0;
-
-            for (String i:inventory){
-                if (i.equals("Green") || i.equals("Purple")){
-                    shotCounter ++;
-                }
-            }
-
-            availableShots = shotCounter;
-        }
-
-        private int getNextCycle(){
-            if (currentCycle == 0){
-                return 1;
-            }
-
-            else if (currentCycle == 1){
-                return 2;
-            }
-
-            else if (currentCycle == 2){
-                return 0;
-            }
-
-            return -1;
-        }
-        public boolean isReadyShoot(){
-            return !inventory[currentCycle].equals("Empty");
-        }
-        public int getInvPosition(String color){
-
-            int inventoryCount = 0;
-
-            for (String i: inventory){
-                if (i.equals(color)){
-                    return inventoryCount;
-                }
-                else{
-                    inventoryCount++;
-                }
-            }
-
-            return -1;
-        }
-        private String getTransferColor(){ //TODO REDO WITH NEW 4th POS
-           return inventory[currentCycle];
-        }
-        private boolean checkIfEmptySpot(){
-            for (String i: inventory){
-                if (i.equals("Empty")){
-                    return true;
-                }
-            }
-            return false;
-        }
-        public void telemetryInventory(){
-            telemetry.addData("Inventory: ", inventory[0] + ", " + inventory[1] + ", " + inventory[2]);
+            return Arrays.equals(tempArrayInventory,tempArrayPattern);
         }
         private void updateInventory(){
-
             //Won't override updates
             if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
                 return;
             }
-
             inventory[currentCycle] = getIntakeColor();
         }
 
-        //----------------------------------------
-
-        //Color Sensor
-
-        public float[] getHSV(){
-
-            float[] hsv = new float[]{0F,0F,0F};
-
-            Color.RGBToHSV(colorSensor.red()*255,colorSensor.green()*255,colorSensor.blue()*255, hsv);
-
-            return hsv;
-        }
-        private boolean detectedArtifact(){
-            return colorSensorDist.getDistance(DistanceUnit.CM) < 3;
-        }
-        public String getIntakeColor() {
-            if (detectedArtifact()) {
-                float[] HSV = getHSV();
-
-                if (HSV[0] < 200){
-                    return "Green";
-                }
-                else if (HSV[0] >= 200){
-                    return "Purple";
-                }
-            }
-
-            return "Empty";
-        }
-        public void telemetryColorSensor(){
-            float[] HSV = getHSV();
-            telemetry.addData("HSV", HSV[0] + "," + HSV[1] + "," + HSV[2]);
-        }
-
-        //----------------------------------------
-
-        //Indicator Lights
-
-        public void updateIndicators(){
-            if (hasPattern()){ //TODO Set Numbers
-                indicatorOne.setPosition(1);
-            }
-            else{
-                indicatorOne.setPosition(0);
-            }
-
-            if (getTransferColor().equals("Green")){
-                indicatorTwo.setPosition(1);
-            }
-            else if (getTransferColor().equals("Purple")){
-                indicatorTwo.setPosition(0);
-            }
-            else{
-                indicatorTwo.setPosition(0.5);
-            }
-        }
-
-        //----------------------------------------
-
-        //Transfer
+        /** Transfer */
+        //TODO Make this more clean
 
         public void toggleTransfer(){
             if (!transferUp){
@@ -956,18 +709,209 @@ public class RobotDataV2 {
             transferServo.setPosition(RobotConstantsV2.TRANSFER_DOWN);
             transferUp = false;
         }
+        private void checkForShotOpportunity(){
+            if (isCaroselInPlace() && !shotInProg && isReadyShoot()){ //TODO There is nothing to prevent an accdiental mag ls read from killing everything
+                forceTransferUp();
+                shotInProg = true;
+            }
+        }
+        private void checkResetTransfer(){
+            if (shotInProg && isShotSuccess()){
+                forceTransferDown();
+                shotInProg = false;
+                transferCooldownActive = true;
+                transferCooldown.reset();
+            }
+        }
+        private void checkEndShotCoolDown(){
+            if (!shotInProg && transferCooldownActive && transferCooldown.milliseconds() > RobotConstantsV2.COOLDOWN_SHOT){
+                transferCooldownActive = false;
+            }
+        }
+        private void updateAvailableShots(){
+
+            int shotCounter = 0;
+
+            for (String i:inventory){
+                if (i.equals("Green") || i.equals("Purple")){
+                    shotCounter ++;
+                }
+            }
+
+            availableShots = shotCounter;
+        }
+        public boolean isReadyShoot(){
+            return !inventory[currentCycle].equals("Empty");
+        }
+        private String getTransferColor(){ //TODO REDO WITH NEW 4th POS
+            return inventory[currentCycle];
+        }
+        private boolean checkIfEmptySpot(){
+            for (String i: inventory){
+                if (i.equals("Empty")){
+                    return true;
+                }
+            }
+            return false;
+        }
         public boolean isShotSuccess(){
             return transferBeam.getDistance(DistanceUnit.CM) < 2;
         } //TODO might need replace with actual beam breaker
 
+        /** Sub Modes */
+        //TODO Currently Cycling has wrapping, might need to implement hold system -_- for shortest path
+        public void cycleRapidFire(){
+            //Activates once if shots are available to shoot
+            //Won't Cycle or Update Coutner if the robot has just shot something
+            //Will only cycle if its empty at shooter spot
+            //WILL NOT SPIN until the magnetic limit switch in in place (prevent skipping)
+            //TODO Could still skip if mid spin it detects something, testing overwritten method for busy
+            if (availableShots > 0 && !shotInProg && !isReadyShoot() && isCaroselInPlace() && !isBusy(caroselMotor)){//TODO Might not work
+                cycleCarosel(getNextCycle());
+                updateAvailableShots(); //TODO SLightly more inefficent but good for redundency
+            }
 
-        //----------------------------------------
+            checkForShotOpportunity();
+            checkResetTransfer();
+            checkEndShotCoolDown();
+        }
+        public void cycleSortedFire(){
 
-        //Magnetic Limit Swtich
+            //Activates once if shots are available to shoot
+            //Won't Cycle or Update Coutner if the robot has just shot something
+            //Will only cycle if its empty at shooter spot
+            //WILL NOT SPIN until the magnetic limit switch in in place (prevent skipping)
+            //TODO Could still skip if mid spin it detects something, testing overwritten method for busy
+            if (availableShots > 0 && !shotInProg && !isReadyShoot() && isCaroselInPlace() && !isBusy(caroselMotor)){//TODO Might not work
+                cyclePattern(sortedFireQueue);
+                updateAvailableShots(); //TODO SLightly more inefficent but good for redundency
+                sortedFireQueue ++;
+            }
 
+            checkForShotOpportunity();
+            checkResetTransfer();
+            checkEndShotCoolDown();
+
+        }
+        private void cycleCaroselManual(){
+            cycleCarosel(getNextCycle()); //TODO Previous cycle too
+        }
+
+
+        /** Intake Cycling */
+        public void autoIntakeCycle(){
+            if (detectedArtifact()){
+                updateInventory();
+                cycleCarosel(getNextCycle());
+            }
+        }
+
+        /** Spindex */
+        public void cycleCarosel(int desiredCycle){
+            if (!transferCooldownActive && !shotInProg){
+                updateInventory();
+                currentCycle = desiredCycle;
+
+                caroselMotor.setTargetPosition(RobotConstantsV2.caroselPos[desiredCycle]);
+                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                caroselMotor.setVelocity(2400);
+            }
+        }
+        public void cyclePattern(int number){
+            int slot = getInvPosition(pattern[number]);
+
+            if (slot == -1){
+                return;
+            }
+
+            cycleCarosel(slot);
+        }
+        private int getNextCycle(){
+            if (currentCycle == 0){
+                return 1;
+            }
+
+            else if (currentCycle == 1){
+                return 2;
+            }
+
+            else if (currentCycle == 2){
+                return 0;
+            }
+
+            return -1;
+        }
+        public int getInvPosition(String color){
+
+            int inventoryCount = 0;
+
+            for (String i: inventory){
+                if (i.equals(color)){
+                    return inventoryCount;
+                }
+                else{
+                    inventoryCount++;
+                }
+            }
+
+            return -1;
+        }
+
+        /** Intake Color Detection */
+        public float[] getHSV(){
+
+            float[] hsv = new float[]{0F,0F,0F};
+            Color.RGBToHSV(colorSensor.red()*255,colorSensor.green()*255,colorSensor.blue()*255, hsv);
+            return hsv;
+        }
+        private boolean detectedArtifact(){
+            return intakeBeam.getDistance(DistanceUnit.CM) < 3;
+        } //TODO Update Logic
+        public String getIntakeColor() {
+            if (detectedArtifact()) {
+                float[] HSV = getHSV();
+
+                if (HSV[0] < 200){
+                    return "Green";
+                }
+                else if (HSV[0] >= 200){
+                    return "Purple";
+                }
+            }
+
+            return "Empty";
+        }
+
+        /** Indicator Lights */
+        public void updateIndicators(){
+            if (hasPattern()){ //TODO Set Numbers
+                indicatorOne.setPosition(1);
+            }
+            else{
+                indicatorOne.setPosition(0);
+            }
+
+            if (getTransferColor().equals("Green")){
+                indicatorTwo.setPosition(1);
+            }
+            else if (getTransferColor().equals("Purple")){
+                indicatorTwo.setPosition(0);
+            }
+            else{
+                indicatorTwo.setPosition(0.5);
+            }
+        }
+
+        /** Magnetic Limit Switch */
         public boolean isCaroselInPlace(){
             return !magLS.getState();
         }
 
+        /** Final Updates */
+        public void telemetryCarosel(){
+            telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
+            float[] HSV = getHSV();
+            telemetry.addLine(String.format("HSV: (%0.5f, %0.5f, %0.5f)", HSV[0], HSV[1], HSV[2]));
+        }
     }
 }

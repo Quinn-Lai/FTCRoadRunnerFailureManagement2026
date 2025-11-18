@@ -67,66 +67,82 @@ public class DriverControlBlue extends OpMode {
             robotData.getDriveTrain().switchMode();
         }
 
-        if (robotData.getDriveTrain().getCurrentMode()){
-            robotData.getDriveTrain().setMode(gamepad1,"Auto Aim Mode");
-        }
-        else{
-            robotData.getDriveTrain().setMode(gamepad1,"Manual Mode");
-        }
-
-        robotData.getDriveTrain().updateModeColor();
-        robotData.getDriveTrain().omniDrive();
-
         //-----------------------------------------------------
 
-        //Auto Aim Mode
+        //Main Mode
 
-        if (robotData.getDriveTrain().getCurrentMode()){
+        //TODO Add Quick Submodes to Current
+        switch (robotData.getDriveTrain().getCurrentMode()){
+            //Auto Aim
+            case ("auto"):
+                robotData.getDriveTrain().setMode(gamepad1,"Auto Aim Mode");
 
-            //Toggle Motors & Aim
-            if (gamepad1.circleWasPressed()){
-                robotData.getTurret().switchTurretMode();
-            }
+                //Toggle Motors & Aim
+                if (gamepad1.circleWasPressed()){
+                    robotData.getTurret().switchTurretMode();
+                }
 
-            //Passive Auto Aim
-            if (robotData.getTurret().isToggleTurretAim()){
+                //Passive Auto Aim
+                if (robotData.getTurret().isToggleTurretAim()){
+                    if (atVision.canSeeAT()){
+                        robotData.getTurret().aimBall(atVision.getDisp());
+                        robotData.updateTelemetry(telemetry);
+                        robotData.getTurret().telemetryArm(atVision.getDisp());
+                    }
+                    else{
+                        robotData.getTurret().aimBall(1.7901);
+                        telemetry.addLine("Eyes Closed");
+                    }
 
-            }
-            else{
-                robotData.getTurret().killShooterPower();
-            }
+                }
+                else{
+                    robotData.getTurret().killShooterPower();
+                }
+
+                break;
+
+            //Manual
+            case("manual"):
+                robotData.getDriveTrain().setMode(gamepad1,"Manual Mode");
+
+                if (gamepad1.optionsWasPressed()){
+                    robotData.getTurret().switchTurretMode();
+                }
+
+                else if (gamepad1.circleWasPressed()){
+                    robotData.getTurret().switchTurretManualClose();
+                }
+
+                if (robotData.getTurret().isToggleTurretAim()){
+                    robotData.getTurret().aimBall(3);
+                }
+
+                else if (robotData.getTurret().isToggleTurretManualClose()){
+                    robotData.getTurret().aimBall(1.7);
+                }
+
+                else{
+                    robotData.getTurret().killShooterPower();
+                }
+
+                break;
+
+            default:
+                //TODO Something
+                break;
+        }
+
+        if (gamepad1.optionsWasPressed() || gamepad2.optionsWasPressed()){
+            robotData.getDriveTrain().cycleNextSubMode();
+        }
+        robotData.getDriveTrain().updateCurrentSubMode();
+
+        switch(robotData.getDriveTrain().getCurrentSubMode()){
 
         }
 
 
-        //-----------------------------------------------------
 
-        //Manual Mode
-
-        else{
-
-
-            if (gamepad1.optionsWasPressed()){
-                robotData.getTurret().switchTurretMode();
-            }
-
-            else if (gamepad1.circleWasPressed()){
-                robotData.getTurret().switchTurretManualClose();
-            }
-
-            if (robotData.getTurret().isToggleTurretAim()){
-                robotData.getTurret().aimBall(3);
-            }
-
-            else if (robotData.getTurret().isToggleTurretManualClose()){
-                robotData.getTurret().aimBall(1.7);
-            }
-
-            else{
-                robotData.getTurret().killShooterPower();
-            }
-
-        }
 
         //-----------------------------------------------------
 
@@ -144,6 +160,11 @@ public class DriverControlBlue extends OpMode {
 
         //-----------------------------------------------------
 
+        //Movement
+
+        robotData.getDriveTrain().updateModeColor();
+        robotData.getDriveTrain().omniDrive();
+
         //Telemetry
 
         //End Game Rumbling
@@ -156,10 +177,6 @@ public class DriverControlBlue extends OpMode {
         else{
             telemetry.addLine("Eyes Closed");
         }
-
-        //Nerd Stuff
-
-
 
         telemetry.update();
     }
