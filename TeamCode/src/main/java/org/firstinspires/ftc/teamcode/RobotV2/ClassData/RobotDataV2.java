@@ -946,7 +946,7 @@ public class RobotDataV2 {
 //                    }
 //
                     //Input constant disp in main file
-                    //Motor Speed (Don't Need Multiple Colors) //TODO TPS ERror Going to be wrong here (not right)
+                    //Motor Speed (Don't Need Multiple Colors)
                     if (turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
@@ -989,7 +989,7 @@ public class RobotDataV2 {
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
                     }
                     else{
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
                     }
 
                     break;
