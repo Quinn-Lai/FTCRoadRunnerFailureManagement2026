@@ -28,11 +28,26 @@ public class RobotConstantsV2 {
     /** Fly Wheel Parameters */
     public static final int HUMAN_INTAKE_SPEED = 500;
     public static final int KILL_SHOOTER_SPEED = 0;
-    public static double FAR_BALL_DISTANCE = 3.0; //TODO Experiment with this value
+    public static final double FAR_BALL_DISTANCE = 3.0; //TODO Experiment with this value
+    public static final double CLOSE_BALL_DISTANCE = 1.7901; //TODO Experiment with this value
     public static final double FAR_TPS = 1750; //TODO Experiment with This (or just use default calc)
 
     /** Hood Parameters */
     public static final int ANGLE_BONUS = 15;
+
+    /** Limelight Parameters */
+    public static final double LIMELIGHT_TURRET_DIFFERENCE = 0.1; //TODO RANDOM NUMBER
+
+    /** Indicator Colors */
+    public static final double INDICATOR_GREEN = 0.5;
+    public static final double INDICATOR_PURPLE = 0.722;
+    public static final double INDICATOR_RED = 0.277;
+    public static final double INDICATOR_YELLOW = 0.388;
+    public static final double INDICATOR_BLUE = 0.611;
+
+    /** Indicator Logic */
+    public static final double SHOOTER_MIN_SPEED_THRESHOLD = -0.01;
+    public static final double SHOOTER_MAX_SPEED_THRESHOLD = 0.01;
 
 
 }

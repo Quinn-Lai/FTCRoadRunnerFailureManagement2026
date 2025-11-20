@@ -99,6 +99,9 @@ public class LimeLightVision {
     public void initLimeLight(){
         limelight.start();
     }
+    public void killLimeLight(){
+        limelight.close();
+    }
     public LLResult getResults(){
         return limelight.getLatestResult();
     }
@@ -139,10 +142,10 @@ public class LimeLightVision {
     }
     public double getDisp(){
         if (getResults().isValid()){
-            return levelLensAtHeight / Math.tan(getTyFidDeg());
+            return (levelLensAtHeight / Math.tan(getTyFidDeg())) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
-    }
+    } //TODO need to account for height difference and displacement (prob jsut add center of lens to launch zone)
 
     /** Last Updates */
     public void telemetryLimeLight(){

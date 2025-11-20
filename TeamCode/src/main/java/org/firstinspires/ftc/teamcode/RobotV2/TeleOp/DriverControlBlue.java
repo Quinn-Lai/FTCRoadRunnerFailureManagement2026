@@ -5,7 +5,9 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.AprilTagVisionV2;
+import org.firstinspires.ftc.teamcode.RobotV2.ClassData.LimeLightVision;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RoadRunnerDataV2;
+import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
 @Disabled
@@ -14,33 +16,28 @@ public class DriverControlBlue extends OpMode {
 
     //Data Classes
     private RoadRunnerDataV2 rrData;  //Road Runner Implementation
-    private AprilTagVisionV2 atVision; //April Tag Vision
     private RobotDataV2 robotData;       //Basic Robot Mechanics
+    private LimeLightVision limelight;
 
     //Runs Once on Init
     @Override
     public void init(){
 
-        atVision = new AprilTagVisionV2(hardwareMap,telemetry,"blue");
-        robotData = new RobotDataV2(hardwareMap, telemetry, atVision);       //Basic Robot Mechanics
-        atVision.updateAtHeight(robotData.getTurret().getHeightOfLauncher());
-
+        limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
+        robotData = new RobotDataV2(hardwareMap, telemetry);       //Basic Robot Mechanics
         rrData = new RoadRunnerDataV2(robotData);
 
-        robotData.getDriveTrain().setMode(gamepad1,"Auto Aim Mode");
-        atVision.initAprilTag();
+        limelight.initLimeLight();
+        robotData.getDriveTrain().setGamepad(gamepad1);
     }
 
     @Override
     public void init_loop(){
         telemetry.addLine("Waiting for Round to Start");
-        atVision.telemetryAprilTag();
 
-        if (atVision.canSeeAT()){
-            robotData.updateTelemetry(telemetry);
-            telemetry.addData("Yaw: ", atVision.getYaw());
-            telemetry.addData("X: ", atVision.getXPos());
-            robotData.getTurret().telemetryArm(atVision.getDisp());
+        if (limelight.getResults().isValid()){
+            limelight.telemetryLimeLight();
+            robotData.getTurret().telemetryTurret(limelight.getDisp());
         }
 
         telemetry.update();
@@ -57,37 +54,25 @@ public class DriverControlBlue extends OpMode {
     @Override
     public void loop(){
 
+        /** Insert Words */
+
         robotData.updateTelemetry(telemetry);
-        robotData.getDriveTrain().displayTelemetryData();
+        robotData.getDriveTrain().setGamepad(gamepad1);
 
-        //-----------------------------------------------------
-
-        //Mode Switching
-        if (gamepad1.shareWasPressed() || gamepad2.shareWasPressed()){
-            robotData.getDriveTrain().switchMode();
-        }
-
-        //-----------------------------------------------------
-
-        //Main Mode
-
-        //TODO Add Quick Submodes to Current
+        /** Main Mode */
         switch (robotData.getDriveTrain().getCurrentMode()){
             //Auto Aim
             case ("auto"):
-                robotData.getDriveTrain().setMode(gamepad1,"Auto Aim Mode");
 
-                //Toggle Motors & Aim
-                if (gamepad1.circleWasPressed()){
-                    robotData.getTurret().switchTurretMode();
-                }
+                //Direction
+                robotData.getTurret().deactivateHumanIntakeMode();
 
                 //Passive Auto Aim
                 if (robotData.getTurret().isToggleTurretAim()){
-                    if (atVision.canSeeAT()){
-                        robotData.getTurret().aimBall(atVision.getDisp());
+                    if (limelight.getResults().isValid()){
+                        robotData.getTurret().aimBall(limelight.getDisp());
                         robotData.updateTelemetry(telemetry);
-                        robotData.getTurret().telemetryArm(atVision.getDisp());
+                        robotData.getTurret().telemetryTurret(limelight.getDisp());
                     }
                     else{
                         robotData.getTurret().aimBall(1.7901);
@@ -96,82 +81,168 @@ public class DriverControlBlue extends OpMode {
 
                 }
                 else{
-                    robotData.getTurret().killShooterPower();
+                    robotData.getTurret().killShooter();
                 }
+
+                if (gamepad1.dpadRightWasPressed()){
+                    robotData.getDriveTrain().requestSortedFire();
+                }
+
+                //Auto Cycling
+                robotData.getCarosel().autoIntakeCycle();
+
+                //Indicators
+                robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),robotData.getTurret());
 
                 break;
 
             //Manual
             case("manual"):
-                robotData.getDriveTrain().setMode(gamepad1,"Manual Mode");
 
+                //Direction
+                robotData.getTurret().deactivateHumanIntakeMode();
+
+                //Far Shot
                 if (gamepad1.optionsWasPressed()){
-                    robotData.getTurret().switchTurretMode();
+                    robotData.getTurret().switchTurretFar();
                 }
 
-                else if (gamepad1.circleWasPressed()){
-                    robotData.getTurret().switchTurretManualClose();
-                }
-
+                //Active Aim
                 if (robotData.getTurret().isToggleTurretAim()){
-                    robotData.getTurret().aimBall(3);
+                    if (robotData.getTurret().isFarToggled()){
+                        robotData.getTurret().aimBall(RobotConstantsV2.FAR_BALL_DISTANCE);
+                        robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.FAR_BALL_DISTANCE,robotData.getTurret());
+                    }
+                    else{
+                        robotData.getTurret().aimBall(RobotConstantsV2.CLOSE_BALL_DISTANCE);
+                        robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.CLOSE_BALL_DISTANCE,robotData.getTurret());
+                    }
                 }
-
-                else if (robotData.getTurret().isToggleTurretManualClose()){
-                    robotData.getTurret().aimBall(1.7);
-                }
-
                 else{
-                    robotData.getTurret().killShooterPower();
+                    robotData.getTurret().killShooter();
+                }
+
+
+                //Cycling
+
+                if (gamepad1.squareWasPressed()){
+                    robotData.getCarosel().cycleCaroselManual();
                 }
 
                 break;
+
+            case("humanIntake"):
+                if (robotData.getTurret().isToggleTurretAim()){
+                    robotData.getTurret().activateHumanIntakeMode(robotData.getCarosel());
+                }
+                else{
+                    robotData.getTurret().killShooter();
+                    robotData.getTurret().deactivateHumanIntakeMode();
+                }
+
+
+
+                robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0,robotData.getTurret());
 
             default:
-                //TODO Something
+                telemetry.addLine("Richie is Bald");
                 break;
         }
 
-        if (gamepad1.optionsWasPressed() || gamepad2.optionsWasPressed()){
-            robotData.getDriveTrain().cycleNextSubMode();
-        }
-        robotData.getDriveTrain().updateCurrentSubMode();
-
-        switch(robotData.getDriveTrain().getCurrentSubMode()){
-
-        }
-
-
-
-
         //-----------------------------------------------------
 
-        //Shared Controls
+        /** Shared Controls */
 
+        /** Switch Turret Mode */
+        if (gamepad1.circleWasPressed()){
+            robotData.getTurret().switchTurretMode();
+        }
 
-        //-----------------------------------------------------
+        /** Mode Switching */
+        if (gamepad1.shareWasPressed() || gamepad2.shareWasPressed()){
+            robotData.getDriveTrain().switchMode();
+        }
+        else if (gamepad1.dpadUpWasPressed()){
+            robotData.getDriveTrain().switchHumanIntake();
+        }
 
-        //Auto Park
+        /** Auto Park */
 
-        if (robotData.getDriveTrain().getMode().left_trigger > 0.75 && robotData.getDriveTrain().getMode().right_trigger > 0.75){
+        if (gamepad1.left_trigger > 0.75 && gamepad1.right_trigger > 0.75){
+            rrData.addTeleOpAction(rrData.getTestSeqAction()); //Replace with Auto Park
+            rrData.runTeleOpActions();
+        }
+
+        /** Sub Modes */
+
+        if (gamepad1.dpadLeftWasPressed()){
+            robotData.getDriveTrain().requestRapidFire();
+        }
+
+        if (gamepad1.crossWasPressed()){
+            robotData.getCarosel().switchIntake();
+        }
+
+        /** Sub Modes */
+
+        if (gamepad1.rightBumperWasPressed()){
+            robotData.getCarosel().toggleTransfer();
+        }
+
+        /** Auto Align */
+
+        //Deadman's switch
+        if (gamepad1.leftBumperWasPressed() && gamepad1.left_trigger > 0.5){ //TODO use limelight to get 2D pose, generate a trajectory, run it
             rrData.addTeleOpAction(rrData.getTestSeqAction()); //Replace with Auto Park
             rrData.runTeleOpActions();
         }
 
         //-----------------------------------------------------
 
-        //Movement
+        /** Sub Modes Requested */
 
-        robotData.getDriveTrain().updateModeColor();
+        switch(robotData.getDriveTrain().getCurrentSubMode()){
+
+            //TODO can do it this way and add stage progression system
+
+            //Rapid Fire
+            case ("rapidFire"): //TODO Not aligned with array in constants
+
+                //TODO Use Subzone here at some point
+                //while ()
+
+                robotData.getCarosel().cycleRapidFire();
+
+                robotData.getDriveTrain().endSubMode();
+
+                break;
+
+            case ("sortedFire"):
+
+                robotData.getDriveTrain().endSubMode();
+
+                break;
+
+            default:
+                break;
+
+        }
+
+
+        //-----------------------------------------------------
+
+        /** Last Calls */
+        robotData.getDriveTrain().updateModeColor(robotData.getTurret());
         robotData.getDriveTrain().omniDrive();
 
-        //Telemetry
+        /** Telemetry */
+        robotData.getDriveTrain().telemetryDriveTrain();
 
-        //End Game Rumbling
+        /** Rumbling */
         robotData.getDriveTrain().checkEndgame();
 
-        //Check If Can See April Tag
-        if (atVision.canSeeAT()){
+        /** AprilTag Seen */
+        if (limelight.getResults().isValid()){
             telemetry.addLine("Eyes Open");
         }
         else{
@@ -184,6 +255,6 @@ public class DriverControlBlue extends OpMode {
     //Runs at End
     @Override
     public void stop(){
-        atVision.closeVisionPortal();
+        limelight.killLimeLight();
     }
 }

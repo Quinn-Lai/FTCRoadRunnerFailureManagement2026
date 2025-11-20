@@ -38,7 +38,6 @@ public class RobotDataV2 {
     private DriveTrain driveTrain;
     private Turret turret;
     private Carosel carosel;
-    private LimeLightVision limeLight;
 
     /** Open CV */
     private boolean openCVEnabled;
@@ -46,7 +45,7 @@ public class RobotDataV2 {
     //----------------------------------------
 
     /** Constructor */
-    public RobotDataV2(HardwareMap hardwareMap, Telemetry telemetry, LimeLightVision limeLight){
+    public RobotDataV2(HardwareMap hardwareMap, Telemetry telemetry){
 
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
@@ -54,7 +53,6 @@ public class RobotDataV2 {
         turret = new Turret(hardwareMap);
         carosel = new Carosel(hardwareMap);
         driveTrain = new DriveTrain(hardwareMap);
-        this.limeLight = limeLight;
         runtime = null;
     }
 
@@ -207,6 +205,9 @@ public class RobotDataV2 {
         public void requestSortedFire(){
             currentSubMode = RobotConstantsV2.subModes[1];
         }
+        public void endSubMode(){
+            currentMode = RobotConstantsV2.subModes[2];
+        }
 
         /** Movement */
         public void omniDrive(){
@@ -298,12 +299,18 @@ public class RobotDataV2 {
         }
 
         /** Final Updates */
-        public void updateModeColor(){
+        public void updateModeColor(Turret turret){
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
                 driver.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
             }
             else if (currentMode.equals(RobotConstantsV2.mainModes[1])){
-                driver.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                //Differentiate these two
+                if (turret.isFarToggled()){
+                    driver.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                }
+                else{
+                    driver.setLedColor( 0, 0.5, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                }
             }
             else{
                 driver.setLedColor( 1, 0, 0, Gamepad.LED_DURATION_CONTINUOUS);
@@ -489,9 +496,12 @@ public class RobotDataV2 {
         }
 
         /** Human Player Intake Mode */
-        public void activateHumanIntakeMode(){
+        public void activateHumanIntakeMode(Carosel carosel){
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
             powerShooterMotor(RobotConstantsV2.HUMAN_INTAKE_SPEED);
+
+            carosel.autoIntakeCycle();
+
         }
         public void deactivateHumanIntakeMode(){
             shooterMotor.setDirection(DcMotor.Direction.FORWARD);
@@ -536,8 +546,11 @@ public class RobotDataV2 {
             telemetry.addData("Turret On: ", toggleTurretAim);
             telemetry.addData("Close Shot: ", !isFar);
         }
-        private double getTPSError(double disp){
+        public double getTPSError(double disp){
             return shooterMotor.getVelocity() - getTPS(disp);
+        }
+        private double getManualTPSError(double TPS){
+            return shooterMotor.getVelocity() - TPS;
         }
         public void telemetryTurret(double disp){
             telemetry.addLine("Kinematics: \n");
@@ -645,7 +658,7 @@ public class RobotDataV2 {
         }
 
         /** Intake */
-        public void intakeArtifact(){
+        public void switchIntake(){
             if (!intakeMotorOn){
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_ON);
                 intakeMotorOn = true;
@@ -746,7 +759,7 @@ public class RobotDataV2 {
         private String getTransferColor(){ //TODO REDO WITH NEW 4th POS
             return inventory[currentCycle];
         }
-        private boolean checkIfEmptySpot(){
+        private boolean isEmptySpot(){
             for (String i: inventory){
                 if (i.equals("Empty")){
                     return true;
@@ -767,7 +780,7 @@ public class RobotDataV2 {
             //WILL NOT SPIN until the magnetic limit switch in in place (prevent skipping)
             //TODO Could still skip if mid spin it detects something, testing overwritten method for busy
             if (availableShots > 0 && !shotInProg && !isReadyShoot() && isCaroselInPlace() && !isBusy(caroselMotor)){//TODO Might not work
-                cycleCarosel(getNextCycle());
+                cycleCaroselManual(); //TODO Heurstic, not efficent
                 updateAvailableShots(); //TODO SLightly more inefficent but good for redundency
             }
 
@@ -793,16 +806,15 @@ public class RobotDataV2 {
             checkEndShotCoolDown();
 
         }
-        private void cycleCaroselManual(){
+        public void cycleCaroselManual(){
             cycleCarosel(getNextCycle()); //TODO Previous cycle too
         }
 
-
         /** Intake Cycling */
-        public void autoIntakeCycle(){
-            if (detectedArtifact()){
+        public void autoIntakeCycle(){ //Added Magnetic Limitt Switch Here for saftey
+            if (detectedArtifact() && !inventory[currentCycle].equals("Empty") && isCaroselInPlace()){
                 updateInventory();
-                cycleCarosel(getNextCycle());
+                cycleCaroselManual();
             }
         }
 
@@ -865,8 +877,8 @@ public class RobotDataV2 {
             return hsv;
         }
         private boolean detectedArtifact(){
-            return intakeBeam.getDistance(DistanceUnit.CM) < 3;
-        } //TODO Update Logic
+            return intakeBeam.getDistance(DistanceUnit.CM) < 3 || !getIntakeColor().equals("Empty");
+        } //TODO ALSO ADD IF SPOT IN CURRCENT  CYCLE ISn"T EMPTY LOGIC WORK TOO
         public String getIntakeColor() {
             if (detectedArtifact()) {
                 float[] HSV = getHSV();
@@ -883,23 +895,114 @@ public class RobotDataV2 {
         }
 
         /** Indicator Lights */
-        public void updateIndicators(){
-            if (hasPattern()){ //TODO Set Numbers
-                indicatorOne.setPosition(1);
-            }
-            else{
-                indicatorOne.setPosition(0);
+        public void updateIndicators(String mode, double disp, Turret turret){
+
+            switch (mode){
+                //TODO not synced to constants
+                case("auto"):
+
+                    //Motor Speed (Don't Need Multiple Colors)
+                    if (turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                    }
+                    else{
+                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                    }
+
+                    //Current Color
+
+                    //Live View (also invententory for redundency
+                    if (getIntakeColor().equals("Purple")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+                    }
+                    else if (getIntakeColor().equals("Green")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                    }
+                    else{
+                        if (inventory[currentCycle].equals("Purple")){
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+                        }
+                        else if (inventory[currentCycle].equals("Green")){
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                        }
+                        else{
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
+                        }
+                    }
+
+                    break;
+
+                case("manual"):
+
+                    //double neededTPS; //TODO if separate TPS from angle, need use this
+//                    //Code for Long
+//                    if (disp == -1){
+//                        neededTPS = RobotConstantsV2.FAR_TPS;
+//                    }
+//
+//                    //Code for Close
+//                    else if (disp == -2){
+//                        neededTPS =
+//                    }
+//
+                    //Input constant disp in main file
+                    //Motor Speed (Don't Need Multiple Colors) //TODO TPS ERror Going to be wrong here (not right)
+                    if (turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                    }
+                    else{
+                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                    }
+
+                    //Current Color
+                    //Live View (also invententory for redundency
+                    if (getIntakeColor().equals("Purple")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+                    }
+                    else if (getIntakeColor().equals("Green")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                    }
+                    else{
+                        if (inventory[currentCycle].equals("Purple")){
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+                        }
+                        else if (inventory[currentCycle].equals("Green")){
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                        }
+                        else{
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
+                        }
+                    }
+
+                    break;
+
+                case("humanIntake"):
+
+                    indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE); //Shows that Human Player Mode
+
+                    //Double Check Make Sure it empty currently
+                    if (!isEmptySpot()){
+                        //Inventory is Full
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_RED);
+                    }
+                    else if (!detectedArtifact() || inventory[currentCycle].equals("Empty")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                    }
+                    else{
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                    }
+
+                    break;
+
+                default:
+                    //UH OH SOME ERROR HERE
+                    indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                    indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+
+                    break;
+
             }
 
-            if (getTransferColor().equals("Green")){
-                indicatorTwo.setPosition(1);
-            }
-            else if (getTransferColor().equals("Purple")){
-                indicatorTwo.setPosition(0);
-            }
-            else{
-                indicatorTwo.setPosition(0.5);
-            }
         }
 
         /** Magnetic Limit Switch */
