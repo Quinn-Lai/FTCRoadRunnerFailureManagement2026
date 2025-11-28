@@ -15,10 +15,10 @@ public class PIDTuner extends LinearOpMode {
     public static double TPS = 1000;
     private DcMotorEx testMotor;
 
-    public static double kP = 0;
-
-    public static double kI = 0;
-    public static double kD = 0;
+    private static double kP = 6.7;
+    private static double kI = 0.53;
+    private static double kD = 0.3;
+    private static double kF = 0;
 
     private ElapsedTime PIDTimer = new ElapsedTime();
 
@@ -26,7 +26,7 @@ public class PIDTuner extends LinearOpMode {
     private double lastError = 0;
 
     public String getPIDCos(){
-        return kP + ", " + kI + ", " + kD;
+        return String.format("kP: %s, kI: %s, kD: %s, kF: %s ",kP, kI, kD, kF);
     }
 
     public double PIDShooter(double current, double desired) {
@@ -45,11 +45,7 @@ public class PIDTuner extends LinearOpMode {
 
         PIDTimer.reset();
 
-        output = (error * kP) + (derivate * kD) + (integralSum * kI);
-
-        telemetry.addData("Error P:",error);
-        telemetry.addData("Derivate: ", derivate);
-        telemetry.addData("IntegralSum", integralSum);
+        output = (error * kP) + (derivate * kD) + (integralSum * kI) + (desired * kF);
 
         return output;
     }
