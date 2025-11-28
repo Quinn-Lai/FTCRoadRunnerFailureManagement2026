@@ -30,7 +30,7 @@ public class LimeLightVision {
 
     /** Variables */
     private double atHeight; //Meters
-    private String[] motifCode;
+    public static String[] motifCode;
     private String alliance;
     private Telemetry telemetry;
 
@@ -86,10 +86,10 @@ public class LimeLightVision {
 
         /** Variable Init */
         this.atHeight = 0.756015; //approximation 0.756015
-        motifCode = null;
+        motifCode = new String[]{"Empty","Empty","Empty"};
         this.telemetry = telemetry;
 
-        lensHeight = 0.3; //TODO Tune this
+        lensHeight = 0.24;
         levelLensAtHeight = atHeight - lensHeight;
     }
 
@@ -145,7 +145,7 @@ public class LimeLightVision {
             return (levelLensAtHeight / Math.tan(getTyFidDeg())) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
-    } //TODO need to account for height difference and displacement (prob jsut add center of lens to launch zone)
+    }
 
     /** Last Updates */
     public void telemetryLimeLight(){
@@ -160,7 +160,6 @@ public class LimeLightVision {
     public void updateAtHeight(double heightOfLauncher){
         atHeight -= heightOfLauncher;
     }
-
 
     /** Motif */
     public void updateMotifCode(){ //Could possibly see oblisk and motif at the same time
@@ -181,9 +180,9 @@ public class LimeLightVision {
             }
         }
     }
-    public String[] getMotifCode(){
-        return motifCode;
-    }
+//    public String[] getMotifCode(){
+//        return motifCode;
+//    }
     public boolean foundMotif(){
         return motifCode != null;
     }
