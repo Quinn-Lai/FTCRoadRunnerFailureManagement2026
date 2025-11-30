@@ -23,6 +23,7 @@ public class DriverControlBlue extends OpMode {
     //Runs Once on Init
     @Override
     public void init(){
+        RobotConstantsV2.updateCaroselPos(0);
 
         limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
         robotData = new RobotDataV2(hardwareMap, telemetry);
@@ -48,6 +49,10 @@ public class DriverControlBlue extends OpMode {
     //Runs Once on Start
     @Override
     public void start(){
+
+        //TODO REMOVE THIS IT IS TEMP
+        //LimeLightVision.isFoundMotif = false;
+
         robotData.getCarosel().forceTransferDown();
         RobotDataV2.createRuntime();
         //rrData.createDashboard();
@@ -63,8 +68,7 @@ public class DriverControlBlue extends OpMode {
         robotData.getDriveTrain().setGamepad(gamepad1);
 
         /** Main Mode */
-        if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
-            switch (robotData.getDriveTrain().getCurrentMode()){
+        switch (robotData.getDriveTrain().getCurrentMode()){
                 //Auto Aim
                 case ("auto"):
 
@@ -79,7 +83,7 @@ public class DriverControlBlue extends OpMode {
                             robotData.getTurret().telemetryTurret(limelight.getDisp());
                         }
                         else{
-                            robotData.getTurret().aimBall(1.7901);
+                            robotData.getTurret().aimBall(RobotConstantsV2.CLOSE_BALL_DISTANCE);
                             telemetry.addLine("Eyes Closed");
                         }
 
@@ -89,14 +93,14 @@ public class DriverControlBlue extends OpMode {
                     }
 
                     if (gamepad1.dpadRightWasPressed()){
-                        robotData.getDriveTrain().requestSortedFire(robotData.getCarosel());
+                        robotData.getDriveTrain().requestSortedFire();
                     }
 
-                    //Auto Cycling
-                    robotData.getCarosel().autoIntakeCycle();
 
-                    //Indicators
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),robotData.getTurret(),limelight);
+                    //Auto Cycling (Don't want it cycling during submodes)
+                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")) robotData.getCarosel().autoIntakeCycle();
+
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),limelight);
 
                     break;
 
@@ -115,49 +119,52 @@ public class DriverControlBlue extends OpMode {
                     if (robotData.getTurret().isToggleTurretAim()){
                         if (robotData.getTurret().isFarToggled()){
                             robotData.getTurret().aimBall(RobotConstantsV2.FAR_BALL_DISTANCE);
-                            robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.FAR_BALL_DISTANCE,robotData.getTurret(),limelight);
                         }
                         else{
                             robotData.getTurret().aimBall(RobotConstantsV2.CLOSE_BALL_DISTANCE);
-                            robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.CLOSE_BALL_DISTANCE,robotData.getTurret(),limelight);
                         }
                     }
                     else{
                         robotData.getTurret().killShooter();
                     }
 
-                    //Cycling
+                    //Cycling (Don't want cycling during submodes)
+                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
+                        if (gamepad1.touchpad){
+                            RobotConstantsV2.updateCaroselPos((int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
+                            telemetry.addData("Increment:", (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
+                            telemetry.addData("Position 1: ", RobotConstantsV2.caroselPos[0]);
+                            robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
+                        }
 
-                    if (gamepad1.touchpad_finger_1){
-                        RobotConstantsV2.updateCaroselPos((int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-                        telemetry.addData("Increment:", (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-                        telemetry.addData("Position 1: ", RobotConstantsV2.caroselPos[0]);
-                        robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
+                        if (gamepad1.squareWasPressed()){
+                            robotData.getCarosel().cycleCaroselManual();
+                        }
                     }
 
-                    if (gamepad1.squareWasPressed()){
-                        robotData.getCarosel().cycleCaroselManual();
-                    }
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0,limelight);
 
                     break;
 
                 case("humanIntake"):
                     if (robotData.getTurret().isToggleTurretAim()){
-                        robotData.getTurret().activateHumanIntakeMode(robotData.getCarosel());
+                        robotData.getTurret().activateHumanIntakeMode();
                     }
                     else{
                         robotData.getTurret().killShooter();
                         robotData.getTurret().deactivateHumanIntakeMode();
                     }
 
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0,robotData.getTurret(), limelight);
+                    //robotData.getCarosel().updateInventory();
+                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")) robotData.getCarosel().autoIntakeCycle();
+
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0, limelight);
                     break;
 
                 default:
                     telemetry.addLine("Richie is Bald");
                     break;
             }
-        }
 
         //-----------------------------------------------------
 
@@ -172,7 +179,9 @@ public class DriverControlBlue extends OpMode {
         if (gamepad1.shareWasPressed() || gamepad2.shareWasPressed()){
             robotData.getDriveTrain().switchMode();
         }
-        else if (gamepad1.dpadUpWasPressed()){
+
+        //Can't switch to human player mode when in submode
+        else if (gamepad1.dpadUpWasPressed() && robotData.getDriveTrain().getCurrentSubMode().equals("none")){
             robotData.getDriveTrain().switchHumanIntake();
         }
 
@@ -186,7 +195,7 @@ public class DriverControlBlue extends OpMode {
         /** Sub Modes */
 
         if (gamepad1.dpadLeftWasPressed()){
-            robotData.getDriveTrain().requestRapidFire(robotData.getCarosel());
+            robotData.getDriveTrain().requestRapidFire();
         }
 
         if (gamepad1.crossWasPressed()){
@@ -223,26 +232,32 @@ public class DriverControlBlue extends OpMode {
                 switch (robotData.getCarosel().getCurrentSubModeQueue()){
                     case ("cycle"):
 
-                        robotData.getCarosel().cycleRapidFire();
+                        if (!robotData.getCarosel().isTransferCooldownActive()){
+                            robotData.getCarosel().cycleRapidFire();
 
-                        if (robotData.getCarosel().isCaroselInPlace()){
-                            robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
-                            robotData.getCarosel().activateTransferInProg();
+                            if (robotData.getCarosel().isCaroselInPlace()){
+                                robotData.getCarosel().resetShotSuccess();
+                                robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                                robotData.getCarosel().activateTransferInProg();
+                            }
                         }
 
                         break;
 
                     case ("transfer"):
 
-                        robotData.getCarosel().subModeTransferStartTimer();
-                        robotData.getCarosel().checkShotSuccess();
-
-                        if (robotData.getCarosel().getShotSuccessInstant() && !robotData.getCarosel().isTransferCooldownActive()){ //TODO might have to do time based here
-                            robotData.getCarosel().resetShotSuccess();
+                        if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode() || !robotData.getCarosel().detectedArtifact()){
+                            robotData.getCarosel().endFailsafeSubmode();
                             robotData.getCarosel().incrementRapidFireCurrentShotCount();
                             robotData.getCarosel().activateCycleInProg();
                             robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                            break;
                         }
+
+                        robotData.getCarosel().subModeTransferStartTimer();
+                        robotData.getCarosel().checkShotSuccess();
+                        telemetry.addData("Shot Success", robotData.getCarosel().isShotSuccess());
+                        telemetry.addData("Shot Success Instant", robotData.getCarosel().getShotSuccessInstant());
 
                         break;
 
@@ -254,34 +269,43 @@ public class DriverControlBlue extends OpMode {
                 break;
 
             case ("sortedFire"):
+
+                if (robotData.getCarosel().getSortedFireCurrentShotCount() >= robotData.getCarosel().getMaxShots()) {
+                    robotData.getDriveTrain().endSubMode();
+                    break;
+                }
+
                 switch (robotData.getCarosel().getCurrentSubModeQueue()){
                     case ("cycle"):
 
-                        if (robotData.getCarosel().getSortedFireCurrentShotCount() >= RobotConstantsV2.RAPID_FIRE_MAX_SHOTS) {
-                            robotData.getDriveTrain().endSubMode();
-                            break;
-                        }
+                        if (!robotData.getCarosel().isTransferCooldownActive()){
 
-                        robotData.getCarosel().cycleSortedFire(robotData.getCarosel().getSortedFireCurrentShotCount());
+                            robotData.getCarosel().cycleSortedFire(robotData.getCarosel().getSortedFireCurrentShotCount());
 
-                        if (robotData.getCarosel().isCaroselInPlace()){
-                            robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
-                            robotData.getCarosel().activateTransferInProg();
+                            if (robotData.getCarosel().isCaroselInPlace()){
+                                robotData.getCarosel().resetShotSuccess();
+                                robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                                robotData.getCarosel().activateTransferInProg();
+                            }
+
                         }
 
                         break;
 
                     case ("transfer"):
 
-                        robotData.getCarosel().subModeTransferStartTimer();
-                        robotData.getCarosel().checkShotSuccess();
-
-                        if (robotData.getCarosel().getShotSuccessInstant() && !robotData.getCarosel().isTransferCooldownActive()){
-                            robotData.getCarosel().resetShotSuccess();
+                        if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode() || !robotData.getCarosel().detectedArtifact()){
+                            robotData.getCarosel().endFailsafeSubmode();
                             robotData.getCarosel().incrementSortedFireCurrentShotCount();
                             robotData.getCarosel().activatePatternInProg();
                             robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                            break;
                         }
+
+                        robotData.getCarosel().subModeTransferStartTimer();
+                        robotData.getCarosel().checkShotSuccess();
+                        telemetry.addData("Shot Success", robotData.getCarosel().isShotSuccess());
+                        telemetry.addData("Shot Success Instant", robotData.getCarosel().getShotSuccessInstant());
 
                         break;
 
@@ -289,7 +313,6 @@ public class DriverControlBlue extends OpMode {
                         break;
 
                 }
-
 
                 break;
 
@@ -303,15 +326,22 @@ public class DriverControlBlue extends OpMode {
 
         robotData.getCarosel().transferReceiveTimer();
 
+        /** Emergency Abort */
+        if (gamepad1.dpadDownWasPressed()){
+            robotData.getDriveTrain().endSubMode();
+        }
+
         //-----------------------------------------------------
 
         /** Last Calls */
-        if (Arrays.equals(LimeLightVision.motifCode,new String[]{"Empty","Empty","Empty"})){
+        if (!(LimeLightVision.isFoundMotif)){
+            LimeLightVision.failsafeMotif();
             limelight.updateMotifCode();        //Very smart ngl
         }
 
-        robotData.getCarosel().updatePattern(LimeLightVision.motifCode);
-        robotData.getDriveTrain().updateModeColor(robotData.getTurret());
+        robotData.getCarosel().updatePattern(LimeLightVision.motifCode); //TODO continueous updating not completely nessessary
+        robotData.getDriveTrain().updateModeColor();
+        robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
         robotData.getDriveTrain().omniDrive();
 
         /** Telemetry */

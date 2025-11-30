@@ -15,10 +15,10 @@ public class PIDTuner extends LinearOpMode {
     public static double TPS = 1000;
     private DcMotorEx testMotor;
 
-    private static double kP = 6.7;
-    private static double kI = 0.53;
-    private static double kD = 0.3;
-    private static double kF = 0;
+    public static double kP = 6.7;
+    public static double kI = 0.53;
+    public static double kD = 0.3;
+    public static double kF = 0;
 
     private ElapsedTime PIDTimer = new ElapsedTime();
 

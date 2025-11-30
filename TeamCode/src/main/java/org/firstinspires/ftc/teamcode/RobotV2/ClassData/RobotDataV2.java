@@ -20,6 +20,8 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
+import java.security.spec.EllipticCurve;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 public class RobotDataV2 {
@@ -30,9 +32,11 @@ public class RobotDataV2 {
     private static ElapsedTime runtime;
 
     /** Auto Status */
-    private boolean pendingColor;
+    private boolean pendingSide;
     private boolean pendingPosition;
     private boolean isStartLeft;
+    private boolean isStartFar;
+    private boolean awaitingTrajectoryGeneration;
 
     /** Main Classes */
     private DriveTrain driveTrain;
@@ -50,11 +54,15 @@ public class RobotDataV2 {
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
 
+        pendingSide = true;
+        pendingPosition = true;
         isStartLeft = true;
+        isStartFar = true;
         turret = new Turret(hardwareMap);
         carosel = new Carosel(hardwareMap);
         driveTrain = new DriveTrain(hardwareMap);
         runtime = null;
+        awaitingTrajectoryGeneration = true;
     }
 
     //----------------------------------------
@@ -101,20 +109,26 @@ public class RobotDataV2 {
     }
 
     /** Auto Status */
-    public boolean isPendingColor(){
-        return pendingColor;
+    public boolean isPendingSide(){
+        return pendingSide;
     }
     public boolean isPendingPosition(){
         return pendingPosition;
     }
-    public void selectedColor(){
-        pendingColor = false;
+    public void selectedSide(){
+        pendingSide = false;
     }
     public void selectedPosition(){
         pendingPosition = false;
     }
     public void setStartLeft(boolean pendingPosition){
         isStartLeft = pendingPosition;
+    }
+    public void setStartFar(boolean far){
+        isStartFar = far;
+    }
+    public boolean isStartFar(){
+        return isStartFar;
     }
     public boolean isStartedLeft(){
         return isStartLeft;
@@ -125,6 +139,12 @@ public class RobotDataV2 {
         }
 
         return "Right";
+    }
+    public boolean isAwaitingTrajectoryGeneration(){
+        return awaitingTrajectoryGeneration;
+    }
+    public void generatedTrajectory(){
+        awaitingTrajectoryGeneration = false;
     }
 
     //----------------------------------------
@@ -175,8 +195,6 @@ public class RobotDataV2 {
 
             robotCentric = true;
             openCVEnabled = false;
-            pendingColor = true;
-            pendingPosition = true;
 
             currentMode = RobotConstantsV2.mainModes[0];
             currentSubMode = RobotConstantsV2.subModes[2];
@@ -223,16 +241,23 @@ public class RobotDataV2 {
         public String getCurrentSubMode(){
             return currentSubMode;
         }
-        public void requestRapidFire(Carosel carosel){
-            carosel.wipeInventory(); //Prevent detection issues later (also acts as a reset)
-            carosel.activateCycleInProg();
-            carosel.setSubModeQueue(RobotConstantsV2.subModeStages[0]);
-            currentSubMode = RobotConstantsV2.subModes[0];
+        public void requestRapidFire(){
+            if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
+                //carosel.wipeInventory(); //Prevent detection issues later (also acts as a reset)
+                turret.deactivateHumanIntakeMode();
+                carosel.activateCycleInProg();
+                carosel.setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                currentSubMode = RobotConstantsV2.subModes[0];
+            }
         }
-        public void requestSortedFire(Carosel carosel){
-            carosel.activatePatternInProg();
-            carosel.setSubModeQueue(RobotConstantsV2.subModeStages[0]);
-            currentSubMode = RobotConstantsV2.subModes[1];
+        public void requestSortedFire(){ //TODO && LimeLightVision.isFoundMotif
+            if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
+                turret.deactivateHumanIntakeMode();
+                carosel.activatePatternInProg();
+                carosel.setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                currentSubMode = RobotConstantsV2.subModes[1];
+                carosel.setMaxShotsPattern();
+            }
         }
 
         public void endSubMode(){
@@ -329,7 +354,7 @@ public class RobotDataV2 {
         }
 
         /** Final Updates */
-        public void updateModeColor(Turret turret){
+        public void updateModeColor(){
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
                 driver.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
             }
@@ -379,10 +404,10 @@ public class RobotDataV2 {
     public class PIDControl{
 
         /** Constants */
-        private double kP = 6.7;
-        private double kI = 0.53;
-        private double kD = 0.3;
-        private double kF = 0;
+        private double kP = 0.71;
+        private double kI = 0.0005;
+        private double kD = 0.35;
+        private double kF = 1;
 
         /** Utility */
         private ElapsedTime PIDTimer = new ElapsedTime();
@@ -506,7 +531,14 @@ public class RobotDataV2 {
             return w;
         }
         private double getTPS(double disp){ //From Radians per Second
-            return ((getRadiansPerSecond(disp) * getW()) / (2 * Math.PI)) * RobotConstantsV2.dragMultiplier;
+
+            double TPSfound = ((getRadiansPerSecond(disp) * getW()) / (2 * Math.PI)) * RobotConstantsV2.dragMultiplier;
+
+            if (TPSfound > 1800){
+                return 1800;
+            }
+
+            return TPSfound;
         }
 
         /** Toggle Turret Modes */
@@ -526,12 +558,9 @@ public class RobotDataV2 {
         }
 
         /** Human Player Intake Mode */
-        public void activateHumanIntakeMode(Carosel carosel){
+        public void activateHumanIntakeMode(){
             shooterMotor.setDirection(DcMotorEx.Direction.FORWARD);
             powerShooterMotor(RobotConstantsV2.HUMAN_INTAKE_SPEED);
-
-            carosel.autoIntakeCycle();
-
         }
         public void deactivateHumanIntakeMode(){
             shooterMotor.setDirection(DcMotorEx.Direction.REVERSE);
@@ -650,6 +679,9 @@ public class RobotDataV2 {
         private int rapidFireCurrentShotCount;
         private int sortedFireCurrentShotCount;
         private boolean shotSucceed;
+        private boolean failsafeSubmode;
+        private ElapsedTime failsafeTimer;
+        private int maxShots;
 
         //----------------------------------------
 
@@ -668,6 +700,7 @@ public class RobotDataV2 {
             transferBeam = hardwareMap.get(DigitalChannel.class,"transferBeam");
 
             intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
+            caroselMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); //TODO dont zero this when we run auto
 
             /** Spindex */
@@ -683,7 +716,9 @@ public class RobotDataV2 {
             transferUp = false;
             transferCooldownActive = false;
             shotSucceed = false;
+            failsafeSubmode = false;
 
+            failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
 
             rapidFireCurrentShotCount = 0;
@@ -705,7 +740,7 @@ public class RobotDataV2 {
                 intakeMotorOn = true;
             }
             else{
-                intakeMotor.setPower(RobotConstantsV2.INTAKE_OFF);
+                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_OFF);
                 intakeMotorOn = false;
             }
         }
@@ -722,21 +757,23 @@ public class RobotDataV2 {
         public void updatePattern(String[] pattern){
             this.pattern = pattern;
         }
-        private boolean hasPattern() {
+        public boolean hasPattern() {
 
-            String[] tempArrayInventory = inventory;
-            String[] tempArrayPattern = pattern;
+            String[] tempArrayInventory = Arrays.copyOf(inventory,inventory.length);
+            String[] tempArrayPattern = Arrays.copyOf(pattern,pattern.length);
 
             Arrays.sort(tempArrayInventory);
             Arrays.sort(tempArrayPattern);
 
             return Arrays.equals(tempArrayInventory,tempArrayPattern);
         }
-        private void updateInventory(){
+        public void updateInventory(){
             //Won't override updates
-            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
+            if (turret.isToggleTurretAim() || inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
                 return;
             }
+            telemetry.addData("Current Cycle NOW: ", currentCycle);
+            telemetry.addData("Current Inv Spoot NOW: ", inventory[currentCycle]);
             inventory[currentCycle] = getIntakeColor();
         }
         private void wipeInventory(){
@@ -768,20 +805,43 @@ public class RobotDataV2 {
         }
 
         /** Sub Modes */
+
+        public int getMaxShots(){
+            return maxShots;
+        }
+
+        public void setMaxShotsPattern(){
+
+            int count = 0;
+
+            for (String i:inventory){
+
+                if (i.equals("Green") || i.equals("Purple")){
+                    count++;
+                }
+            }
+
+            maxShots = count;
+        }
+
+        public void resetMaxShotsPattern(){
+            maxShots = 0;
+        }
+
         public boolean isTransferCooldownActive(){
             return transferCooldownActive;
         }
         public void transferStartTimer(){
-            transferCooldownActive = true;
-            forceTransferUp();
-            transferCooldown.reset();
+            if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
+                transferCooldownActive = true;
+                forceTransferUp();
+                transferCooldown.reset();
+            }
         }
         public void transferReceiveTimer(){
             if (transferCooldownActive && transferCooldown.milliseconds() > RobotConstantsV2.COOLDOWN_SHOT){
                 forceTransferDown();
                 transferCooldownActive = false;
-                transferInProg = false;
-                shotSucceed = false;
             }
         }
         public void activateTransferInProg(){
@@ -793,8 +853,30 @@ public class RobotDataV2 {
                 transferCooldownActive = true;
                 forceTransferUp();
                 transferCooldown.reset();
+                startFailsafeSubmode();
             }
         }
+
+        public void endFailsafeSubmode(){
+            failsafeSubmode = false;
+        }
+
+        public void startFailsafeSubmode(){
+            failsafeSubmode = true;
+            failsafeTimer.reset();
+        }
+        public boolean isFailsafeSubmode(){
+            if (!shotSucceed && failsafeSubmode && failsafeTimer.milliseconds() > RobotConstantsV2.FAILSAFE_SUBMODE_TIMER){
+                failsafeSubmode = false;
+                return true;
+            }
+            else return false;
+        }
+
+        public boolean getTransferInProg(){
+            return transferInProg;
+        }
+
         public void checkShotSuccess(){
             if (isShotSuccess()){
                 shotSucceed = true;
@@ -870,9 +952,7 @@ public class RobotDataV2 {
         }
         public void cycleSortedFire(int patternNum){
             if (patternInProg && patternNum <= 2) {
-                if (!detectedArtifact()){
-                    cyclePattern(patternNum);
-                }
+                cyclePattern(patternNum);
                 patternInProg = false;
             }
         }
@@ -884,12 +964,8 @@ public class RobotDataV2 {
             return inventory[currentCycle];
         }
         private boolean isEmptySpot(){
-//            for (String i: inventory){
-//                if (i.equals("Empty")){
-//                    return true;
-//                }
-//            }
             return Arrays.asList(inventory).contains("Empty");
+            //return !(getEmptySpot() == -1);
         }
         public boolean isShotSuccess(){
             return transferBeam.getState();
@@ -899,21 +975,30 @@ public class RobotDataV2 {
         }
         public int getEmptySpot(){
 
+//            int index = 0;
+//            for (String i: inventory){
+//                if (i.equals("Empty")){
+//                    return index;
+//                }
+//                index ++;
+//            }
+
             return Arrays.asList(inventory).indexOf("Empty");
+            //return -1;
         }
 
         /** Intake Cycling */
-        public void autoIntakeCycle(){ //Added Magnetic Limitt Switch Here for saftey
-            if (detectedArtifact() && isCaroselInPlace()){
+        public void autoIntakeCycle(){
+            telemetry.addData("Next Empty Spot: ", getEmptySpot());
+            if (detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
                 updateInventory();
-                cycleCarosel(getEmptySpot());
+                if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
         }
 
         /** Spindex */
         public void cycleCarosel(int desiredCycle){
             if (!transferCooldownActive){
-                updateInventory();
                 currentCycle = desiredCycle;
 
                 caroselMotor.setTargetPosition(RobotConstantsV2.caroselPos[desiredCycle]);
@@ -921,10 +1006,52 @@ public class RobotDataV2 {
                 caroselMotor.setVelocity(RobotConstantsV2.CAROSEL_SPEED);
             }
         }
+
+        private int getNearestUselessArtifact(){
+
+            ArrayList<String> tempPattern = new ArrayList<String>();
+
+            for (String p:pattern){
+                tempPattern.add(p);
+            }
+
+            for (String i: inventory){
+                for (String p : pattern){
+                    if (i.equals(p)){
+                        tempPattern.remove(p);
+                    }
+                }
+            }
+
+            if (tempPattern.isEmpty()){
+                return -1;
+            }
+
+            return getInvPosition(tempPattern.get(0));
+
+        }
+
+        private int getNearestArtifact(){
+
+            int count = 0;
+
+            for (String i:inventory){
+                if (i.equals("Green") || i.equals("Purple")){
+                    return count;
+                }
+                count ++;
+            }
+            return count;
+        }
+
+        //TODO not optimized yet for patterns (if had GPE, but pattern PPG, then would shoot GP (not PG for max points)
         public void cyclePattern(int number){
             int slot = getInvPosition(pattern[number]);
+            //int trashArtifact = getNearestUselessArtifact();
 
             if (slot == -1){
+                //if (trashArtifact != -1) cycleCarosel(trashArtifact);
+                if (maxShots > sortedFireCurrentShotCount) cycleCarosel(getNearestArtifact());
                 return;
             }
 
@@ -971,9 +1098,9 @@ public class RobotDataV2 {
             Color.RGBToHSV(colorSensor.red()*255,colorSensor.green()*255,colorSensor.blue()*255, hsv);
             return hsv;
         }
-        private boolean detectedArtifact(){
-            return colorSensorDist.getDistance(DistanceUnit.CM) < 3;
-        } //TODO ALSO ADD IF SPOT IN CURRCENT  CYCLE ISn"T EMPTY LOGIC WORK TOO
+        public boolean detectedArtifact(){
+            return colorSensorDist.getDistance(DistanceUnit.CM) < 3 || !inventory[currentCycle].equals("Empty");
+        } //TODO CHECK OVER
         public String getIntakeColor() { //TODO make these static variables for tuning
             if (detectedArtifact()) {
                 float[] HSV = getHSV();
@@ -994,13 +1121,21 @@ public class RobotDataV2 {
         }
 
         /** Indicator Lights */
-        public void updateIndicators(String mode, double disp, Turret turret, LimeLightVision limelight){
+        public void updateIndicators(String mode, double disp, LimeLightVision limelight){
 
             switch (mode){
                 case("auto"):
 
-                    //Motor Speed (Don't Need Multiple Colors)
+                    if (!limelight.getResults().isValid()){
+                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
+                    }
 
+                    //Motor Speed (Don't Need Multiple Colors)
+                    telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
+                    telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
+                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD);
+
+                    //TODO maybe another color for when no vision but can shoot
                     if (!limelight.getResults().isValid() || !turret.isToggleTurretAim() || turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
@@ -1033,6 +1168,14 @@ public class RobotDataV2 {
 
                 case("manual"):
 
+                    if (turret.isFarToggled()){
+                        disp = RobotConstantsV2.FAR_BALL_DISTANCE;
+                    }
+
+                    else{
+                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
+                    }
+
                     //double neededTPS; //TODO if separate TPS from angle, need use this
 //                    //Code for Long
 //                    if (disp == -1){
@@ -1043,9 +1186,13 @@ public class RobotDataV2 {
 //                    else if (disp == -2){
 //                        neededTPS =
 //                    }
+
 //
                     //Input constant disp in main file
                     //Motor Speed (Don't Need Multiple Colors)
+                    telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
+                    telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
+                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD);
                     if (turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
@@ -1062,15 +1209,7 @@ public class RobotDataV2 {
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
                     }
                     else{
-                        if (inventory[currentCycle].equals("Purple")){
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
-                        }
-                        else if (inventory[currentCycle].equals("Green")){
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
-                        }
-                        else{
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
-                        }
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
                     }
 
                     break;
@@ -1112,9 +1251,13 @@ public class RobotDataV2 {
         /** Final Updates */
         public void telemetryCarosel(){
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
+            telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern[0], pattern[1], pattern[2]));
             float[] HSV = getHSV();
             telemetry.addLine(String.format("HSV: (%.5f, %.5f, %.5f)", HSV[0], HSV[1], HSV[2]));
+            telemetry.addData("Current Cycle: ", currentCycle);
             telemetry.addData("Identified Color: ", getIntakeColor());
+            telemetry.addData("Inventory Current: ", inventory[currentCycle]);
+            telemetry.addData("Has Pattern in Inventory: ", hasPattern());
         }
     }
 }

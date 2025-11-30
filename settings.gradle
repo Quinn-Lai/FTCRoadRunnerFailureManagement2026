@@ -1,3 +1,4 @@
 include ':FtcRobotController'
 include ':TeamCode'
 rootProject.name="FTCRoadRunnerFailureManagement2026"
+include ':MeepMeep'

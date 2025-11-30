@@ -31,6 +31,7 @@ public class LimeLightVision {
     /** Variables */
     private double atHeight; //Meters
     public static String[] motifCode;
+    public static boolean isFoundMotif = false;
     private String alliance;
     private Telemetry telemetry;
 
@@ -48,7 +49,7 @@ public class LimeLightVision {
         telemetry.setMsTransmissionInterval(11);
 
         /** Pinpoint Init */
-        imu = hardwareMap.get(GoBildaPinpointDriver.class, "imu");
+        imu = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
 
         GoBildaPinpointDriver.Register[] defaultRegisters = {
                 GoBildaPinpointDriver.Register.DEVICE_STATUS,
@@ -86,7 +87,7 @@ public class LimeLightVision {
 
         /** Variable Init */
         this.atHeight = 0.756015; //approximation 0.756015
-        motifCode = new String[]{"Empty","Empty","Empty"};
+//        motifCode = new String[]{"Empty","Empty","Empty"};
         this.telemetry = telemetry;
 
         lensHeight = 0.24;
@@ -138,11 +139,11 @@ public class LimeLightVision {
         }
 
         return 0;
-
     }
+
     public double getDisp(){
         if (getResults().isValid()){
-            return (levelLensAtHeight / Math.tan(getTyFidDeg())) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
+            return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
     }
@@ -168,23 +169,31 @@ public class LimeLightVision {
 
         for (LLResultTypes.FiducialResult f : fiducials) {
             if (f.getFiducialId() == 21){
+                isFoundMotif = true;
                 motifCode = new String[]{"Green","Purple","Purple"};
             }
 
             else if (f.getFiducialId() == 22){
+                isFoundMotif = true;
                 motifCode = new String[]{"Purple","Green","Purple"};
             }
 
             else if (f.getFiducialId() == 23){
+                isFoundMotif = true;
                 motifCode = new String[]{"Purple","Purple","Green"};
             }
         }
     }
+
+    public static void failsafeMotif(){
+        motifCode = new String[]{"Purple","Purple","Green"};
+    }
+
 //    public String[] getMotifCode(){
 //        return motifCode;
 //    }
     public boolean foundMotif(){
-        return motifCode != null;
+        return isFoundMotif;
     }
 
     /** Alliance */
