@@ -140,6 +140,15 @@ public class RobotDataV2 {
 
         return "Right";
     }
+
+    public String getStartingSide(){
+        if (isStartFar){
+            return "Far Side";
+        }
+
+        return "Close Side";
+    }
+
     public boolean isAwaitingTrajectoryGeneration(){
         return awaitingTrajectoryGeneration;
     }
@@ -364,7 +373,7 @@ public class RobotDataV2 {
                     driver.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
                 }
                 else{
-                    driver.setLedColor( 0, 0.5, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                    driver.setLedColor( 0, 1, 1, Gamepad.LED_DURATION_CONTINUOUS);
                 }
             }
             else{
@@ -581,26 +590,33 @@ public class RobotDataV2 {
             if (angle > RobotConstantsV2.MAX_HOOD_ANGLE) return 0.2;
             else if (angle < RobotConstantsV2.MIN_HOOD_ANGLE) return 0.9;
 
-            return -0.0233333 * angle + 1.6;
-        } //TODO fix regression
+            return (double) Math.round((-0.0388889 * angle + 2.72778) * 1000) / 1000;
+        }
         public void angleRobot(double disp){
             double desiredAngle = getAngleTotal(disp) + RobotConstantsV2.ANGLE_BONUS;
             shooterServo.setPosition(convertDegToServo(desiredAngle));
+            telemetry.addData("a",convertDegToServo(desiredAngle));
+            telemetry.addData("x",desiredAngle);
         }
 
         /** Final Shot */
         public void aimBall(double disp){
             angleRobot(disp);
             double TPS = getTPS(disp);
+            powerShooterMotor(TPS);
+        }
 
-            if (disp < 2.5){
-                powerShooterMotor(TPS);
-                //shooterMotor.setVelocity(TPS);
+        public void aimBallManual(boolean isFarNow, double disp){
+
+            if (isFarNow){
+                angleRobot(disp);
+                powerShooterMotor(RobotConstantsV2.FAR_TPS);
             }
+
             else{
-                //powerShooterMotor(RobotConstantsV2.FAR_TPS); //TODO Separted On Purpose
-                powerShooterMotor(TPS); //TODO Test if can use far default or if camera can pick up
-                //shooterMotor.setVelocity(RobotConstantsV2.longTPS);
+                angleRobot(disp);
+                double TPS = getTPS(disp);
+                powerShooterMotor(TPS);
             }
         }
 
@@ -611,6 +627,10 @@ public class RobotDataV2 {
         }
         public double getTPSError(double disp){
             return shooterMotor.getVelocity() - getTPS(disp);
+        }
+
+        public double getFarShotTPSError(){
+            return shooterMotor.getVelocity() - RobotConstantsV2.FAR_TPS;
         }
         private double getManualTPSError(double TPS){
             return shooterMotor.getVelocity() - TPS;
@@ -668,8 +688,12 @@ public class RobotDataV2 {
         /** Carosel Booleans */
         private boolean intakeMotorOn;
         private boolean transferUp;
+        private boolean autoIntakeCooldownActive;
 
         /** Transfer & Shoot */
+
+        private ElapsedTime autoIntakeCoolDown;
+
         private boolean cycleInProg;
         private boolean patternInProg;
         private String currentSubModeQueue;
@@ -709,6 +733,7 @@ public class RobotDataV2 {
 
             /** Variable Init */
 
+            autoIntakeCooldownActive = false;
             cycleInProg = false;
             patternInProg = false;
             transferInProg = false;
@@ -720,6 +745,7 @@ public class RobotDataV2 {
 
             failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
+            autoIntakeCoolDown = new ElapsedTime();
 
             rapidFireCurrentShotCount = 0;
             sortedFireCurrentShotCount = 0;
@@ -769,7 +795,8 @@ public class RobotDataV2 {
         }
         public void updateInventory(){
             //Won't override updates
-            if (turret.isToggleTurretAim() || inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
+            //TODO remove transfer in prog if its buggy
+            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
                 return;
             }
             telemetry.addData("Current Cycle NOW: ", currentCycle);
@@ -963,7 +990,7 @@ public class RobotDataV2 {
         private String getTransferColor(){ //TODO REDO WITH NEW 4th POS
             return inventory[currentCycle];
         }
-        private boolean isEmptySpot(){
+        public boolean isEmptySpot(){
             return Arrays.asList(inventory).contains("Empty");
             //return !(getEmptySpot() == -1);
         }
@@ -990,8 +1017,15 @@ public class RobotDataV2 {
         /** Intake Cycling */
         public void autoIntakeCycle(){
             telemetry.addData("Next Empty Spot: ", getEmptySpot());
-            if (detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
+            if (!transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
                 updateInventory();
+                autoIntakeCooldownActive = true;
+            }
+        }
+
+        public void receiveAutoCycleStatus(){
+            if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.COOLDOWN_INTAKE){
+                autoIntakeCooldownActive = false;
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
         }
@@ -1170,35 +1204,26 @@ public class RobotDataV2 {
 
                     if (turret.isFarToggled()){
                         disp = RobotConstantsV2.FAR_BALL_DISTANCE;
+
+                        if (turret.getFarShotTPSError() > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getFarShotTPSError() < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                        }
+                        else{
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                        }
                     }
 
                     else{
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
+                        //WOrks because using TPS here
+                        if (turret.getTPSError(disp) > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                        }
+                        else{
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                        }
                     }
 
-                    //double neededTPS; //TODO if separate TPS from angle, need use this
-//                    //Code for Long
-//                    if (disp == -1){
-//                        neededTPS = RobotConstantsV2.FAR_TPS;
-//                    }
-//
-//                    //Code for Close
-//                    else if (disp == -2){
-//                        neededTPS =
-//                    }
-
-//
-                    //Input constant disp in main file
-                    //Motor Speed (Don't Need Multiple Colors)
-                    telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
-                    telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
-                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD);
-                    if (turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
-                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
-                    }
-                    else{
-                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
-                    }
 
                     //Current Color
                     //Live View (also invententory for redundency

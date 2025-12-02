@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.util.Size;
 
+import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -15,6 +16,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 import org.firstinspires.ftc.teamcode.GoBildaPinpointDriver;
+import org.firstinspires.ftc.teamcode.Localizer;
+import org.firstinspires.ftc.teamcode.MecanumDrive;
+import org.firstinspires.ftc.teamcode.PinpointLocalizer;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
@@ -22,11 +26,13 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.List;
 
+import javax.crypto.ExemptionMechanism;
+
 public class LimeLightVision {
 
     /** Hardware */
     private Limelight3A limelight;
-    private GoBildaPinpointDriver imu;
+    private PinpointLocalizer localizer;
 
     /** Variables */
     private double atHeight; //Meters
@@ -34,6 +40,7 @@ public class LimeLightVision {
     public static boolean isFoundMotif = false;
     private String alliance;
     private Telemetry telemetry;
+    private boolean activatedLocalizer;
 
     /** Limelight Variables */
     private double lensHeight;
@@ -45,49 +52,52 @@ public class LimeLightVision {
     public LimeLightVision(HardwareMap hardwareMap, Telemetry telemetry, String alliance){
 
         /** Hardware Init */
+        activatedLocalizer = false;
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         telemetry.setMsTransmissionInterval(11);
-
-        /** Pinpoint Init */
-        imu = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
-
-        GoBildaPinpointDriver.Register[] defaultRegisters = {
-                GoBildaPinpointDriver.Register.DEVICE_STATUS,
-                GoBildaPinpointDriver.Register.LOOP_TIME,
-                GoBildaPinpointDriver.Register.X_ENCODER_VALUE,
-                GoBildaPinpointDriver.Register.Y_ENCODER_VALUE,
-                GoBildaPinpointDriver.Register.X_POSITION,
-                GoBildaPinpointDriver.Register.Y_POSITION,
-                GoBildaPinpointDriver.Register.H_ORIENTATION,
-                GoBildaPinpointDriver.Register.X_VELOCITY,
-                GoBildaPinpointDriver.Register.Y_VELOCITY,
-                GoBildaPinpointDriver.Register.H_VELOCITY,
-        };
-
-        GoBildaPinpointDriver.Register[] onlyPosition = {
-                GoBildaPinpointDriver.Register.DEVICE_STATUS,
-                GoBildaPinpointDriver.Register.X_POSITION,
-                GoBildaPinpointDriver.Register.Y_POSITION,
-                GoBildaPinpointDriver.Register.H_ORIENTATION,
-        };
-
-        imu.setBulkReadScope(defaultRegisters);
-        imu.setErrorDetectionType(GoBildaPinpointDriver.ErrorDetectionType.CRC);
+        //        if (!autoActive){
+//            /** Pinpoint Init */
+//            imu = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+//
+//            GoBildaPinpointDriver.Register[] defaultRegisters = {
+//                    GoBildaPinpointDriver.Register.DEVICE_STATUS,
+//                    GoBildaPinpointDriver.Register.LOOP_TIME,
+//                    GoBildaPinpointDriver.Register.X_ENCODER_VALUE,
+//                    GoBildaPinpointDriver.Register.Y_ENCODER_VALUE,
+//                    GoBildaPinpointDriver.Register.X_POSITION,
+//                    GoBildaPinpointDriver.Register.Y_POSITION,
+//                    GoBildaPinpointDriver.Register.H_ORIENTATION,
+//                    GoBildaPinpointDriver.Register.X_VELOCITY,
+//                    GoBildaPinpointDriver.Register.Y_VELOCITY,
+//                    GoBildaPinpointDriver.Register.H_VELOCITY,
+//            };
+//
+//            GoBildaPinpointDriver.Register[] onlyPosition = {
+//                    GoBildaPinpointDriver.Register.DEVICE_STATUS,
+//                    GoBildaPinpointDriver.Register.X_POSITION,
+//                    GoBildaPinpointDriver.Register.Y_POSITION,
+//                    GoBildaPinpointDriver.Register.H_ORIENTATION,
+//            };
+//
+//            imu.setBulkReadScope(defaultRegisters);
+//            imu.setErrorDetectionType(GoBildaPinpointDriver.ErrorDetectionType.CRC);
+//
+//            imu.resetPosAndIMU();
+//        }
 
 //        imu.setOffsets(-84.0, -168.0, DistanceUnit.MM); //TODO Tune offsets, Might not need tho
 //        imu.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
 //        imu.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
 
-        imu.resetPosAndIMU();
-
         /** Alliance */
         this.alliance = alliance;
+
         if (alliance.equals("blue")) limelight.pipelineSwitch(0);
         else limelight.pipelineSwitch(1);
 
         /** Variable Init */
         this.atHeight = 0.756015; //approximation 0.756015
-//        motifCode = new String[]{"Empty","Empty","Empty"};
+//      motifCode = new String[]{"Empty","Empty","Empty"};
         this.telemetry = telemetry;
 
         lensHeight = 0.24;
@@ -97,9 +107,26 @@ public class LimeLightVision {
     //----------------------------------------
 
     /** Limelight */
+
+    public Pose2d getCurrentPosLimelight(){
+
+        if (getResults().isValid() && getResults() != null){
+            return new Pose2d(0,0,0); //TODO emergency
+        }
+
+        return new Pose2d(getResults().getBotpose().getPosition().x,getResults().getBotpose().getPosition().y, localizer.getHeadingLocalizerDegrees());
+
+    }
+
+    public void setLimelightLocalizier(PinpointLocalizer localizer){
+        activatedLocalizer = true;
+        this.localizer = localizer;
+    }
+
     public void initLimeLight(){
         limelight.start();
     }
+
     public void killLimeLight(){
         limelight.close();
     }
@@ -114,11 +141,9 @@ public class LimeLightVision {
     }
 
     /** IMU Pinpoint */
-    public void recalibrateIMUStatus(){
-        imu.recalibrateIMU();;
-    }
+
     public double getYaw(){ //TODO might not be the same as april tag library pipline
-        return imu.getHeading(AngleUnit.DEGREES);
+        return localizer.getHeadingLocalizerDegrees();
     }
 
     /** Data */
@@ -142,7 +167,7 @@ public class LimeLightVision {
     }
 
     public double getDisp(){
-        if (getResults().isValid()){
+        if (getResults().isValid() && getResults() != null){
             return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
@@ -156,7 +181,7 @@ public class LimeLightVision {
         }
     }
     public void updateOrientationIMU(){
-        limelight.updateRobotOrientation(getYaw());
+        if(activatedLocalizer) limelight.updateRobotOrientation(getYaw());
     }
     public void updateAtHeight(double heightOfLauncher){
         atHeight -= heightOfLauncher;

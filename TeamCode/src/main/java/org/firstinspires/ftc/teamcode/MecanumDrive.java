@@ -63,14 +63,14 @@ public final class MecanumDrive {
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
 
         // drive model parameters
-        public double inPerTick = 1;
-        public double lateralInPerTick = inPerTick;
-        public double trackWidthTicks = 0;
+        public double inPerTick = 0.00196228892726490;
+        public double lateralInPerTick = 0.0010618395605716284;
+        public double trackWidthTicks = 7352.831157615246;
 
         // feedforward parameters (in tick units)
-        public double kS = 0;
-        public double kV = 0;
-        public double kA = 0;
+        public double kS = 2.240527158529554;
+        public double kV = 0.00016057218396113557;
+        public double kA = 0.00006;
 
         // path profile parameters (in inches)
         public double maxWheelVel = 50;
@@ -82,13 +82,13 @@ public final class MecanumDrive {
         public double maxAngAccel = Math.PI;
 
         // path controller gains
-        public double axialGain = 0.0;
-        public double lateralGain = 0.0;
-        public double headingGain = 0.0; // shared with turn
+        public double axialGain = 8;
+        public double lateralGain = 2;
+        public double headingGain = 3.5;
 
-        public double axialVelGain = 0.0;
-        public double lateralVelGain = 0.0;
-        public double headingVelGain = 0.0; // shared with turn
+        public double axialVelGain = 2;
+        public double lateralVelGain = 1;
+        public double headingVelGain = 1; // shared with turn
     }
 
     public static Params PARAMS = new Params();
@@ -248,6 +248,11 @@ public final class MecanumDrive {
         localizer = new PinpointLocalizer(hardwareMap,PARAMS.inPerTick, pose);
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
+    }
+
+    //TODO add
+    public PinpointLocalizer getLocalizerPinpoint(){
+        return (PinpointLocalizer) localizer;
     }
 
     public void setDrivePowers(PoseVelocity2d powers) {

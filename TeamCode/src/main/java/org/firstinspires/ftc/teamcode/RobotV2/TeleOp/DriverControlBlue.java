@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.RobotV2.TeleOp;
 
+import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -25,9 +26,15 @@ public class DriverControlBlue extends OpMode {
     public void init(){
         RobotConstantsV2.updateCaroselPos(0);
 
-        limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
         robotData = new RobotDataV2(hardwareMap, telemetry);
         rrData = new RoadRunnerDataV2(robotData);
+        limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
+
+        /** Road Runner Init */
+        rrData.setBeginPoseFromAuto();
+        rrData.createDrive();
+
+        limelight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
 
         limelight.initLimeLight();
         robotData.getDriveTrain().setGamepad(gamepad1);
@@ -50,17 +57,16 @@ public class DriverControlBlue extends OpMode {
     @Override
     public void start(){
 
-        //TODO REMOVE THIS IT IS TEMP
-        //LimeLightVision.isFoundMotif = false;
-
         robotData.getCarosel().forceTransferDown();
         RobotDataV2.createRuntime();
-        //rrData.createDashboard();
+        rrData.createDashboard();
     }
 
     //Loops after Start
     @Override
     public void loop(){
+
+        limelight.updateOrientationIMU();
 
         /** First Updates */
 
@@ -98,7 +104,15 @@ public class DriverControlBlue extends OpMode {
 
 
                     //Auto Cycling (Don't want it cycling during submodes)
-                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")) robotData.getCarosel().autoIntakeCycle();
+                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
+
+                        robotData.getCarosel().autoIntakeCycle();
+                        robotData.getCarosel().receiveAutoCycleStatus();
+
+                        if (gamepad1.squareWasPressed() && !robotData.getCarosel().isEmptySpot()){
+                            robotData.getCarosel().cycleCaroselManual();
+                        }
+                    }
 
                     robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),limelight);
 
@@ -118,10 +132,10 @@ public class DriverControlBlue extends OpMode {
                     //Active Aim
                     if (robotData.getTurret().isToggleTurretAim()){
                         if (robotData.getTurret().isFarToggled()){
-                            robotData.getTurret().aimBall(RobotConstantsV2.FAR_BALL_DISTANCE);
+                            robotData.getTurret().aimBallManual(robotData.getTurret().isFarToggled(),RobotConstantsV2.CLOSE_BALL_DISTANCE);
                         }
                         else{
-                            robotData.getTurret().aimBall(RobotConstantsV2.CLOSE_BALL_DISTANCE);
+                            robotData.getTurret().aimBallManual(robotData.getTurret().isFarToggled(),RobotConstantsV2.CLOSE_BALL_DISTANCE);
                         }
                     }
                     else{
@@ -156,8 +170,15 @@ public class DriverControlBlue extends OpMode {
                     }
 
                     //robotData.getCarosel().updateInventory();
-                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")) robotData.getCarosel().autoIntakeCycle();
+                    if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
 
+                        robotData.getCarosel().autoIntakeCycle();
+                        robotData.getCarosel().receiveAutoCycleStatus();
+
+                        if (gamepad1.squareWasPressed() && !robotData.getCarosel().isEmptySpot()){
+                            robotData.getCarosel().cycleCaroselManual();
+                        }
+                    }
                     robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0, limelight);
                     break;
 
@@ -187,8 +208,9 @@ public class DriverControlBlue extends OpMode {
 
         /** Auto Park */
 
-        if (gamepad1.left_trigger > 0.75 && gamepad1.right_trigger > 0.75){
-            rrData.addTeleOpAction(rrData.getTestSeqAction()); //Replace with Auto Park
+        if (gamepad1.left_trigger > 0.75 && gamepad1.right_trigger > 0.75 && !rrData.getNotAutoPosStored()){
+            rrData.killTeleOpActions();
+            rrData.addTeleOpAction(rrData.getParkingTrajectory(rrData.getDrive().getLocalizerPinpoint().getPose(), limelight.getAlliance())); //Replace with Auto Park
             rrData.runTeleOpActions();
         }
 
@@ -211,8 +233,9 @@ public class DriverControlBlue extends OpMode {
         /** Auto Align */
 
         //Deadman's switch
-        if (gamepad1.leftBumperWasPressed() && gamepad1.left_trigger > 0.5){ //TODO use limelight to get 2D pose, generate a trajectory, run it
-            rrData.addTeleOpAction(rrData.getTestSeqAction()); //Replace with Auto Park
+        if (gamepad1.leftBumperWasPressed() && gamepad1.left_trigger > 0.5 && !rrData.getNotAutoPosStored() && limelight.getResults().isValid()){ //TODO can switch getting current pos using limelight
+            rrData.killTeleOpActions(); //rrData.getDrive().getLocalizerPinpoint().getPose(),
+            rrData.addTeleOpAction(rrData.getAlignTrajectory(limelight.getCurrentPosLimelight() ,limelight.getYaw()));
             rrData.runTeleOpActions();
         }
 

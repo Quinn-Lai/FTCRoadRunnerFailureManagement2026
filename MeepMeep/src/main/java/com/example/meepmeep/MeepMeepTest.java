@@ -9,8 +9,8 @@ public class MeepMeepTest {
     public static void main(String[] args) {
         MeepMeep meepMeep = new MeepMeep(700);
 
-        Pose2d spawn = new Pose2d(57, -10, Math.toRadians(180));
-        Pose2d shootingPos = new Pose2d(57, -10, Math.toRadians(200));
+        Pose2d spawn = new Pose2d(61.065, -13, Math.toRadians(180));
+        Pose2d shootingPos = new Pose2d(51, -13, Math.toRadians(205));
         Pose2d lineBot = new Pose2d(34, -28, Math.toRadians(270));
         Pose2d lineBotCollect = new Pose2d(34, -55, Math.toRadians(270));
         Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
@@ -21,36 +21,36 @@ public class MeepMeepTest {
         RoadRunnerBotEntity myBot = new DefaultBotBuilder(meepMeep)
                 // Set bot constraints: maxVel, maxAccel, maxAngVel, maxAngAccel, track width
                 .setConstraints(60, 60, Math.toRadians(180), Math.toRadians(180), 15)
+                .setDimensions(16.945,17.87)
                 .build();
 
         myBot.runAction(myBot.getDrive().actionBuilder(spawn)
 
-                .setTangent(Math.toRadians(200))
-                .splineToLinearHeading(lineBot, Math.toRadians(180))
-                .setTangent(Math.toRadians(270))
-                .splineToLinearHeading(lineBotCollect, Math.toRadians(270))
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineBot, Math.toRadians(90))
-                .setTangent(0)
-                .splineToLinearHeading(shootingPos,Math.toRadians(90))
+                .setTangent(Math.toRadians(180))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
 
                 .setTangent(Math.toRadians(200))
-                .splineToLinearHeading(lineMid, Math.toRadians(180))
+                .splineToSplineHeading(lineBot, Math.toRadians(270))
+                .setTangent(Math.toRadians(270))
+                .splineToSplineHeading(lineBotCollect, Math.toRadians(270))
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(20))
+
+                .setTangent(Math.toRadians(200))
+                .splineToLinearHeading(lineMid, Math.toRadians(180)) //270 maybe
                 .setTangent(Math.toRadians(270))
                 .splineToLinearHeading(lineMidCollect, Math.toRadians(270))
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineMid, Math.toRadians(90))
-                .setTangent(0)
-                .splineToLinearHeading(shootingPos,Math.toRadians(90))
+                .setTangent(Math.toRadians(45))
+                .splineToLinearHeading(shootingPos,Math.toRadians(20))
 
                 .setTangent(Math.toRadians(200))
                 .splineToLinearHeading(lineTop, Math.toRadians(180))
                 .setTangent(Math.toRadians(270))
                 .splineToLinearHeading(lineTopCollect, Math.toRadians(270))
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineTop, Math.toRadians(90))
-                .setTangent(0)
-                .splineToLinearHeading(shootingPos,Math.toRadians(90))
+//                .setTangent(Math.toRadians(90))
+//                .splineToLinearHeading(lineTop, Math.toRadians(90))
+                .setTangent(Math.toRadians(10))
+                .splineToLinearHeading(shootingPos,Math.toRadians(20))
 
                 .build());
 

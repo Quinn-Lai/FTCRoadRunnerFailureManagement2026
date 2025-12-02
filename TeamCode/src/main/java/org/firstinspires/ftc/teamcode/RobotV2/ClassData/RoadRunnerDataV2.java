@@ -27,6 +27,10 @@ public class RoadRunnerDataV2{
     private FtcDashboard dash;
     private TelemetryPacket packet;
     private List<Action> teleOpActions;
+    public static Pose2d lastAutoPosition = null; //TODO maybe issue
+    private boolean notAutoPositionStored;
+    private Pose2d parkingSpotBlue;
+    private Pose2d parkingSpotRed;
 
 //    public RoadRunnerData(HardwareMap hardwareMap) {
 //        robot = new RobotData(hardwareMap);
@@ -41,6 +45,10 @@ public class RoadRunnerDataV2{
         teleOpActions = new ArrayList<>();
         trajectoryBuilt = new ArrayList<Action>();
         beginPose = null;
+        notAutoPositionStored = false;
+
+        parkingSpotBlue = new Pose2d(36.7,32.5,0);
+        parkingSpotRed= new Pose2d(36.7,-32.5,0);
     }
 
     //----------------------------------------
@@ -49,6 +57,19 @@ public class RoadRunnerDataV2{
 
     public Pose2d getBeginPose() {
         return beginPose;
+    }
+    public void setBeginPoseFromAuto(){
+        if (lastAutoPosition != null){
+            notAutoPositionStored = false;
+            beginPose = lastAutoPosition;
+        }
+        else{
+            beginPose = new Pose2d(0,0,0);
+            notAutoPositionStored = true;
+        }
+    }
+    public boolean getNotAutoPosStored(){
+        return notAutoPositionStored;
     }
     public void setBeginPose(Pose2d beginPose) {
         this.beginPose = beginPose;
@@ -94,17 +115,48 @@ public class RoadRunnerDataV2{
 
     //----------------------------------------
 
-    //TeleOp
+    //Create paths
 
-    public SequentialAction getTestSeqAction(){
-        return new SequentialAction(
-                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0.3)),
-                new SleepAction(1),
-                new InstantAction(() -> robot.getDriveTrain().getLFmotor().setPower(0))
-        );
+    public Action getParkingTrajectory(Pose2d currentPos, String alliance){
+
+        Pose2d parkingSpot;
+
+        if (alliance.equals("blue")) parkingSpot = parkingSpotBlue;
+        else parkingSpot = parkingSpotRed;
+
+        TrajectoryActionBuilder park = getDrive().actionBuilder(currentPos)
+                //TODO could set a tangent if calcualted where to go
+                .splineToLinearHeading(parkingSpot, 0);
+
+        Action finalpark = park.build();
+
+        return finalpark;
     }
-    public void addTeleOpAction(SequentialAction action){
+
+    public Action getAlignTrajectory(Pose2d currentPos, double limelightYaw){
+
+        limelightYaw *= -1;
+
+        TrajectoryActionBuilder park = getDrive().actionBuilder(currentPos)
+                .turn(limelightYaw);
+
+        Action finalTurn = park.build();
+
+        return finalTurn;
+
+    }
+
+//    public SequentialAction getParkingSeqAction(Pose2d currentPos, String alliance){
+//        return new SequentialAction(
+//                getParkingTrajectory(currentPos, alliance)
+//        );
+//    }
+    public void addTeleOpAction(Action action){
         teleOpActions.add(action);
+    }
+
+    public void killTeleOpActions(){
+        teleOpActions.clear();
     }
     public void runTeleOpActions(){
 
