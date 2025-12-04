@@ -114,6 +114,7 @@ public class LimeLightVision {
             return new Pose2d(0,0,0); //TODO emergency
         }
 
+        //TODO upload field to file
         return new Pose2d(getResults().getBotpose().getPosition().x,getResults().getBotpose().getPosition().y, localizer.getHeadingLocalizerDegrees());
 
     }
@@ -144,6 +145,20 @@ public class LimeLightVision {
 
     public double getYaw(){ //TODO might not be the same as april tag library pipline
         return localizer.getHeadingLocalizerDegrees();
+    }
+
+    public double getFidYaw(){
+        if (getResults().isValid()){
+            List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
+
+            for (LLResultTypes.FiducialResult f : fiducials) {
+                if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
+                    return f.getTargetXDegreesNoCrosshair();
+                }
+            }
+        }
+
+        return 0;
     }
 
     /** Data */

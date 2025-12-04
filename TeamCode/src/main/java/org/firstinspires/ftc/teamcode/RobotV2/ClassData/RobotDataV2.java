@@ -6,21 +6,19 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.hardware.configuration.annotations.DigitalIoDeviceType;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
-import java.security.spec.EllipticCurve;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -155,6 +153,9 @@ public class RobotDataV2 {
     public void generatedTrajectory(){
         awaitingTrajectoryGeneration = false;
     }
+    public Telemetry getTelemetry(){
+        return telemetry;
+    }
 
     //----------------------------------------
 
@@ -227,6 +228,8 @@ public class RobotDataV2 {
 
         /** Main Modes */
         public void switchMode(){
+            carosel.resetBooleans(); //TODO might be an issue later
+
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
                 currentMode = RobotConstantsV2.mainModes[1];
                 carosel.wipeInventory();
@@ -234,7 +237,7 @@ public class RobotDataV2 {
             else currentMode = RobotConstantsV2.mainModes[0]; //Default to Auto Mode (Even if humanIntake)
         }
         public void switchHumanIntake(){
-
+            carosel.resetBooleans();
             if (currentMode.equals(RobotConstantsV2.mainModes[2])){
                 currentMode = RobotConstantsV2.mainModes[0];
             }
@@ -259,6 +262,11 @@ public class RobotDataV2 {
                 currentSubMode = RobotConstantsV2.subModes[0];
             }
         }
+
+        public void setCurrentSubMode(String submode){
+            currentSubMode = submode;
+        }
+
         public void requestSortedFire(){ //TODO && LimeLightVision.isFoundMotif
             if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
                 turret.deactivateHumanIntakeMode();
@@ -413,15 +421,31 @@ public class RobotDataV2 {
     public class PIDControl{
 
         /** Constants */
-        private double kP = 0.71;
-        private double kI = 0.0005;
-        private double kD = 0.35;
-        private double kF = 1;
+        private double kP = 0.006; //0.71
+        private double kI = 0.0000000001; //0.0005
+        private double kD = 0.00000012; //0.35
+        private double kF = 0.0004; //1
 
         /** Utility */
         private ElapsedTime PIDTimer = new ElapsedTime();
         private double integralSum = 0;
         private double lastError = 0;
+
+
+
+        /** PID for Carosel */
+
+        /** Constants */
+        private double kPC = 3.8;
+        private double kIC = 0;
+        private double kDC = 0.9;
+        private double kFC = 1;
+
+        /** Utility */
+        private ElapsedTime PIDTimerC = new ElapsedTime();
+        private double integralSumC = 0;
+        private double lastErrorC = 0;
+
 
         //----------------------------------------
 
@@ -450,8 +474,29 @@ public class RobotDataV2 {
             output = (error * kP) + (derivate * kD) + (integralSum * kI) + (desired * kF);
 
             return output;
-        } //TODO Tune this
-    } //TODO Update Tester File
+        }
+
+        public double PidCarosel(double current, double desired) {
+
+            double currentTimeC = PIDTimer.seconds();
+
+            double outputC = 0;
+
+            double errorC = desired - current;
+
+            integralSumC += errorC * currentTimeC;
+
+            double derivateC = (errorC - lastErrorC) / currentTimeC;
+
+            lastError = errorC;
+
+            PIDTimerC.reset();
+
+            outputC = (errorC * kPC) + (derivateC * kDC) + (integralSumC * kIC);
+
+            return outputC;
+        }
+    }
 
     //----------------------------------------
 
@@ -487,7 +532,7 @@ public class RobotDataV2 {
             shooterServo = hardwareMap.get(Servo.class,"shooterServo");
 
             shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            shooterMotor.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+            shooterMotor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
             shooterMotor.setDirection(DcMotor.Direction.REVERSE);
 
             /** Mode Init */
@@ -539,7 +584,7 @@ public class RobotDataV2 {
         private double getW(){
             return w;
         }
-        private double getTPS(double disp){ //From Radians per Second
+        public double getTPS(double disp){ //From Radians per Second
 
             double TPSfound = ((getRadiansPerSecond(disp) * getW()) / (2 * Math.PI)) * RobotConstantsV2.dragMultiplier;
 
@@ -562,6 +607,10 @@ public class RobotDataV2 {
             if (isFar) isFar = false;
             else isFar = true;
         }
+        public void toggleTurretFar(boolean isFar){
+            this.isFar = isFar;
+        }
+
         public boolean isFarToggled(){
             return isFar;
         }
@@ -578,10 +627,15 @@ public class RobotDataV2 {
         /** Fly Wheel Power */
         public void powerShooterMotor(double TPS){
             double current = shooterMotor.getVelocity();
-            shooterMotor.setVelocity(PIDShooter(current,TPS));
+            //shooterMotor.setVelocity(PIDShooter(current,TPS));
+            shooterMotor.setPower(PIDShooter(current,TPS));
+            telemetry.addData("TPS NOW", TPS);
+            telemetry.addData("TPS Current: ", current);
+
         }
         public void killShooter(){
-            shooterMotor.setVelocity(RobotConstantsV2.KILL_SHOOTER_SPEED);
+            //shooterMotor.setVelocity(RobotConstantsV2.KILL_SHOOTER_SPEED);
+            shooterMotor.setPower(0);
         }
 
         /** Hood */
@@ -665,7 +719,7 @@ public class RobotDataV2 {
 
     //----------------------------------------
 
-    public class Carosel{
+    public class Carosel extends PIDControl{
 
         /** Hardware */
         private DcMotorEx intakeMotor;
@@ -689,6 +743,7 @@ public class RobotDataV2 {
         private boolean intakeMotorOn;
         private boolean transferUp;
         private boolean autoIntakeCooldownActive;
+        private boolean ejectActive;
 
         /** Transfer & Shoot */
 
@@ -705,6 +760,8 @@ public class RobotDataV2 {
         private boolean shotSucceed;
         private boolean failsafeSubmode;
         private ElapsedTime failsafeTimer;
+        private ElapsedTime cycleTransferCooldown;
+        private boolean cycleTransferCooldownActive;
         private int maxShots;
 
         //----------------------------------------
@@ -725,7 +782,8 @@ public class RobotDataV2 {
 
             intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             caroselMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); //TODO dont zero this when we run auto
+            //caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); //TODO dont zero this when we run auto
+            caroselMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,new PIDFCoefficients(15,0.0001,5,0.2));
 
             /** Spindex */
             inventory = new String[]{"Empty","Empty","Empty"};
@@ -733,6 +791,7 @@ public class RobotDataV2 {
 
             /** Variable Init */
 
+            cycleTransferCooldownActive = false;
             autoIntakeCooldownActive = false;
             cycleInProg = false;
             patternInProg = false;
@@ -742,10 +801,12 @@ public class RobotDataV2 {
             transferCooldownActive = false;
             shotSucceed = false;
             failsafeSubmode = false;
+            ejectActive = false;
 
             failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
             autoIntakeCoolDown = new ElapsedTime();
+            cycleTransferCooldown = new ElapsedTime();
 
             rapidFireCurrentShotCount = 0;
             sortedFireCurrentShotCount = 0;
@@ -754,15 +815,41 @@ public class RobotDataV2 {
 
         //----------------------------------------
 
+        public void resetBooleans(){
+            cycleTransferCooldownActive = false;
+            autoIntakeCooldownActive = false;
+            cycleInProg = false;
+            patternInProg = false;
+            transferInProg = false;
+            transferCooldownActive = false;
+            shotSucceed = false;
+            failsafeSubmode = false;
+        }
+
         /** Autonomous */
+        public void resetCarosel(){
+            caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        }
         public void setInventoryAuto(){
             inventory = new String[]{"Green","Purple","Purple"};
         }
 
         /** Intake */
         public void switchIntake(){
+            intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             if (!intakeMotorOn){
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_ON);
+                intakeMotorOn = true;
+            }
+            else{
+                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_OFF);
+                intakeMotorOn = false;
+            }
+        }
+        public void switchReverseIntake(){
+            intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
+            if (!intakeMotorOn){
+                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
                 intakeMotorOn = true;
             }
             else{
@@ -829,6 +916,7 @@ public class RobotDataV2 {
         public void forceTransferDown(){
             transferServo.setPosition(RobotConstantsV2.TRANSFER_DOWN);
             transferUp = false;
+            transferCooldownActive = false;
         }
 
         /** Sub Modes */
@@ -876,6 +964,28 @@ public class RobotDataV2 {
         }
         public void subModeTransferStartTimer(){
             if (transferInProg){ //
+                transferInProg = false;
+                transferCooldownActive = true;
+                forceTransferUp();
+                transferCooldown.reset();
+                startFailsafeSubmode();
+            }
+        }
+
+        public void startTransferCooldown(){
+            if (!cycleTransferCooldownActive){
+                cycleTransferCooldown.reset();
+                cycleTransferCooldownActive = true;
+            }
+        }
+
+        public void resetTransferStat(){
+            cycleTransferCooldownActive = false;
+        }
+
+        public void cycleTransferStartTimer(){
+            if (transferInProg && cycleTransferCooldownActive && cycleTransferCooldown.milliseconds() > RobotConstantsV2.TRANSFER_COOLDOWN){ //
+
                 transferInProg = false;
                 transferCooldownActive = true;
                 forceTransferUp();
@@ -1015,28 +1125,54 @@ public class RobotDataV2 {
         }
 
         /** Intake Cycling */
+
         public void autoIntakeCycle(){
-            telemetry.addData("Next Empty Spot: ", getEmptySpot());
-            if (!transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
+            //telemetry.addData("Next Empty Spot: ", getEmptySpot());
+            if (!autoIntakeCooldownActive && !transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
                 updateInventory();
                 autoIntakeCooldownActive = true;
+                autoIntakeCoolDown.reset();
             }
+        }
+        public boolean isAutoIntakeCooldownActive(){
+            return autoIntakeCooldownActive;
         }
 
         public void receiveAutoCycleStatus(){
+
             if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.COOLDOWN_INTAKE){
                 autoIntakeCooldownActive = false;
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
         }
 
+        public void checkForAutoEject(){
+            if (!isEmptySpot() && !ejectActive){
+                intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
+                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
+                intakeMotorOn = true;
+                ejectActive = true;
+            }
+
+            else if (isEmptySpot()){
+                ejectActive = false;
+            }
+        }
+
+
         /** Spindex */
+
+        public DcMotorEx getCaroselMotor(){
+            return caroselMotor;
+        }
+
         public void cycleCarosel(int desiredCycle){
             if (!transferCooldownActive){
                 currentCycle = desiredCycle;
 
                 caroselMotor.setTargetPosition(RobotConstantsV2.caroselPos[desiredCycle]);
                 caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                //caroselMotor.setVelocity(PidCarosel(caroselMotor.getCurrentPosition(), RobotConstantsV2.caroselPos[desiredCycle]));
                 caroselMotor.setVelocity(RobotConstantsV2.CAROSEL_SPEED);
             }
         }
@@ -1124,6 +1260,9 @@ public class RobotDataV2 {
         public int getCurrentCycle(){
             return currentCycle;
         }
+        public String[] getInventory(){
+            return inventory;
+        }
 
         /** Intake Color Detection */
         public float[] getHSV(){
@@ -1167,10 +1306,10 @@ public class RobotDataV2 {
                     //Motor Speed (Don't Need Multiple Colors)
                     telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
                     telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
-                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD);
+                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
 
                     //TODO maybe another color for when no vision but can shoot
-                    if (!limelight.getResults().isValid() || !turret.isToggleTurretAim() || turret.getTPSError(disp) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < turret.getTPS(disp) * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                    if (!limelight.getResults().isValid() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
                     else{
@@ -1203,11 +1342,21 @@ public class RobotDataV2 {
                 case("manual"):
 
                     if (turret.isFarToggled()){
-                        disp = RobotConstantsV2.FAR_BALL_DISTANCE;
+                        //disp = RobotConstantsV2.FAR_BALL_DISTANCE;
 
-                        if (turret.getFarShotTPSError() > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getFarShotTPSError() < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+//                        if (turret.getFarShotTPSError() > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getFarShotTPSError() < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+//                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+//                        }
+
+                        telemetry.addData("Distance: ", disp);
+                        telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
+                        telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
+                        telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
+
+                        if (Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
+
                         else{
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
                         }
@@ -1216,7 +1365,7 @@ public class RobotDataV2 {
                     else{
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
                         //WOrks because using TPS here
-                        if (turret.getTPSError(disp) > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getTPSError(disp) < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
+                        if (Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
                         else{
@@ -1241,7 +1390,7 @@ public class RobotDataV2 {
 
                 case("humanIntake"):
 
-                    indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED); //Shows that Human Player Mode
+                    indicatorOne.setPosition(RobotConstantsV2.INDICATOR_ORANGE); //Shows that Human Player Mode
 
                     //Double Check Make Sure it empty currently
                     if (!isEmptySpot()){

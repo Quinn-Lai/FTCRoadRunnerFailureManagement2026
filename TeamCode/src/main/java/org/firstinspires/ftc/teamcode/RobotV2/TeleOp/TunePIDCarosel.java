@@ -1,24 +1,27 @@
-package org.firstinspires.ftc.teamcode.RobotV1.TeleOp;
+package org.firstinspires.ftc.teamcode.RobotV2.TeleOp;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-@TeleOp
-@Config
-public class PIDTuner extends LinearOpMode {
+import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
-    public static double TPS = 1000;
+@Config
+@TeleOp
+
+public class TunePIDCarosel extends LinearOpMode {
+
+    public static int ticks = 64;
     private DcMotorEx testMotor;
 
-    public static double kP = 6.7;
-    public static double kI = 0.53;
-    public static double kD = 0.3;
     public static double kF = 0;
+    public static double kP = 0;
+    public static double kI = 0;
+    public static double kD = 0;
+
 
     private ElapsedTime PIDTimer = new ElapsedTime();
 
@@ -26,7 +29,19 @@ public class PIDTuner extends LinearOpMode {
     private double lastError = 0;
 
     public String getPIDCos(){
-        return String.format("kP: %s, kI: %s, kD: %s, kF: %s ",kP, kI, kD, kF);
+        return kP + ", " + kI + ", " + kD;
+    }
+
+    public void changeKp(double val){
+        kP += val;
+    }
+
+    public void changeKI(double val){
+        kI += val;
+    }
+
+    public void changeKD(double val){
+        kD += val;
     }
 
     public double PIDShooter(double current, double desired) {
@@ -45,7 +60,7 @@ public class PIDTuner extends LinearOpMode {
 
         PIDTimer.reset();
 
-        output = (error * kP) + (derivate * kD) + (integralSum * kI) + (desired * kF);
+        output = (error * kP) + (derivate * kD) + (integralSum * kI);
 
         return output;
     }
@@ -53,36 +68,33 @@ public class PIDTuner extends LinearOpMode {
     @Override
     public void runOpMode(){
 
-        testMotor = (DcMotorEx)(hardwareMap.get(DcMotor.class,"testMotor"));
-        testMotor.setDirection(DcMotor.Direction.REVERSE);
-        testMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        testMotor = (DcMotorEx)(hardwareMap.get(DcMotor.class,"caroselMotor"));
+
         testMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        testMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         waitForStart();
 
         while (opModeIsActive()){
 
-            if (gamepad1.left_bumper){
-                testMotor.setPower(PIDShooter(testMotor.getVelocity(),TPS));
-            }
-            else if(gamepad1.right_bumper){
-                testMotor.setVelocity(TPS);
-            }
-
-            else {
-                testMotor.setVelocity(0);
+            if (gamepad1.square){
+                testMotor.setTargetPosition(ticks);
+                testMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                testMotor.setVelocity(PIDShooter(testMotor.getCurrentPosition(), ticks));
             }
 
-            telemetry.addData("PID ADJUSTED: ", PIDShooter(testMotor.getVelocity(),TPS));
             telemetry.addData("PID Co: ", getPIDCos());
+            telemetry.addData("PID kF: ", kF);
+            telemetry.addData("Current Pos: ", testMotor.getCurrentPosition());
             telemetry.addData("True TPS: ", testMotor.getVelocity());
-            telemetry.addData("Ticks Per Second: ", TPS);
-            telemetry.addData("TPS Error:", testMotor.getVelocity() - TPS);
-
+            telemetry.addData("Ticks Desired: ", ticks);
+            telemetry.addData("Tick Error:", testMotor.getCurrentPosition() - ticks);
 
             telemetry.update();
+
         }
 
     }
 
 }
+
