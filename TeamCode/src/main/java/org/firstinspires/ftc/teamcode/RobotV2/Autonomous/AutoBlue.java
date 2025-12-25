@@ -2,22 +2,18 @@ package org.firstinspires.ftc.teamcode.RobotV2.Autonomous;
 
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
-import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-import org.firstinspires.ftc.teamcode.RobotV2.ClassData.AprilTagVisionV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.LimeLightVision;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RoadRunnerDataV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
-import org.firstinspires.ftc.vision.opencv.ColorRange;
+
 
 @Autonomous
 public class AutoBlue extends OpMode {
@@ -33,14 +29,17 @@ public class AutoBlue extends OpMode {
         robotData = new RobotDataV2(hardwareMap, telemetry);       //Basic Robot Mechanics
         rrData = new RoadRunnerDataV2(robotData);  //Road Runner Implementation
         limeLight = new LimeLightVision(hardwareMap,telemetry,"blue");
-        limeLight.updateAtHeight(robotData.getTurret().getHeightOfLauncher());
+        limeLight.updateAtHeight(rrData.getRobotData().getTurret().getHeightOfLauncher());
         limeLight.initLimeLight();
 
         LimeLightVision.isFoundMotif = false;
+        RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
+        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
-        robotData.getCarosel().forceTransferDown();
-        robotData.getCarosel().setInventoryAuto();
-        robotData.getCarosel().resetCarosel();
+        rrData.getRobotData().getCarosel().forceTransferDown();
+        rrData.getRobotData().getCarosel().setInventoryAuto();
+        rrData.getRobotData().getCarosel().resetCarosel();
+        rrData.getRobotData().getCarosel().indicatorsInInit();
     }
 
     @Override
@@ -48,71 +47,71 @@ public class AutoBlue extends OpMode {
 
         //Color Selection & OpenCV
 
-        rrData.updateRobotData(robotData);
+        //rrData.updateRobotData(robotData);
 
         limeLight.updateOrientationIMU();
         limeLight.updateMotifCode();
 
-        if (robotData.isPendingSide()){
+        if (rrData.getRobotData().isPendingSide()){
             telemetry.addLine("Select a Starting Side (Far or Close)!");
             telemetry.update();
 
             //Close
             if (gamepad1.dpad_up){
-                robotData.setStartFar(false);
-                robotData.selectedSide();
+                rrData.getRobotData().setStartFar(false);
+                rrData.getRobotData().selectedSide();
             }
 
             //Far Side
             else if (gamepad1.dpad_down){
-                robotData.setStartFar(true);
-                robotData.selectedSide();
+                rrData.getRobotData().setStartFar(true);
+                rrData.getRobotData().selectedSide();
             }
 
         }
 
-        else if (robotData.isPendingPosition()){
+        else if (rrData.getRobotData().isPendingPosition()){
 
             telemetry.addLine("Select a Starting Position (Left or Right)!");
             telemetry.update();
 
             //Left Side
             if (gamepad1.dpad_left){
-                robotData.setStartLeft(true);
-                robotData.selectedPosition();
+                rrData.getRobotData().setStartLeft(true);
+                rrData.getRobotData().selectedPosition();
             }
 
             //Right Side
             else if (gamepad1.dpad_right){
-                robotData.setStartLeft(false);
-                robotData.selectedPosition();
+                rrData.getRobotData().setStartLeft(false);
+                rrData.getRobotData().selectedPosition();
             }
         }
 
         else{
 
-            if (robotData.isAwaitingTrajectoryGeneration()){
+            if (rrData.getRobotData().isAwaitingTrajectoryGeneration()){
 
-                robotData.generatedTrajectory();
+                rrData.getRobotData().generatedTrajectory();
 
                 //Trajectory Left
-                if (robotData.isStartedLeft()){
+                if (rrData.getRobotData().isStartedLeft()){
 
-                    Pose2d lineBot = new Pose2d(34, -28, Math.toRadians(270));
-                    Pose2d lineBotCollect = new Pose2d(34, -52, Math.toRadians(270));
+                    Pose2d lineBot = new Pose2d(33, -28, Math.toRadians(270));
+                    Pose2d lineBotCollect = new Pose2d(33, -42, Math.toRadians(270));
                     Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
-                    Pose2d lineMidCollect = new Pose2d(11, -52, Math.toRadians(270));
+                    Pose2d lineMidCollect = new Pose2d(11, -42, Math.toRadians(270));
                     Pose2d lineTop = new Pose2d(-12, -28, Math.toRadians(270));
-                    Pose2d lineTopCollect = new Pose2d(-12, -49, Math.toRadians(270));
+                    Pose2d lineTopCollect = new Pose2d(-12, -42, Math.toRadians(270));
 
                     //Far Side
-                    if (robotData.isStartFar()){
+                    if (rrData.getRobotData().isStartFar()){
                         rrData.setBeginPose(new Pose2d(61.065, -13, Math.toRadians(180)));
                         rrData.createDrive();
 
                         //Common Positions
                         Pose2d spawn = rrData.getBeginPose();
-                        Pose2d shootingPos = new Pose2d(51, -13, Math.toRadians(200));
+                        Pose2d shootingPos = new Pose2d(51, -13, Math.toRadians(202));
 
                         //Each Route
 
@@ -124,7 +123,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(200))
-                                .splineToLinearHeading(lineBot, Math.toRadians(270));
+                                .splineToLinearHeading(lineBot, Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().actionBuilder(lineBot)
                                 .setTangent(Math.toRadians(270))
@@ -132,11 +131,11 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(lineBotCollect)
                                 .setTangent(Math.toRadians(90))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(20));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(20), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(200))
-                                .splineToLinearHeading(lineMid, Math.toRadians(180));
+                                .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                                 .setTangent(Math.toRadians(270))
@@ -144,11 +143,11 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
                                 .setTangent(Math.toRadians(45))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(20));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(20),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(200))
-                                .splineToLinearHeading(lineTop, Math.toRadians(180));
+                                .splineToLinearHeading(lineTop, Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
                                 .setTangent(Math.toRadians(270))
@@ -156,7 +155,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineTopCollect)
                                 .setTangent(Math.toRadians(10))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(20));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(20), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         //Insert Trajectory Paths Here
                         rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -186,7 +185,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(30))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(30));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(315))
@@ -245,14 +244,14 @@ public class AutoBlue extends OpMode {
 
                 //Trajectory Right
                 else{
-                    Pose2d lineBot = new Pose2d(34, 28, Math.toRadians(90));
-                    Pose2d lineBotCollect = new Pose2d(34, 52, Math.toRadians(90));
+                    Pose2d lineBot = new Pose2d(33, 28, Math.toRadians(90));
+                    Pose2d lineBotCollect = new Pose2d(33, 42, Math.toRadians(90));
                     Pose2d lineMid = new Pose2d(11, 28, Math.toRadians(90));
-                    Pose2d lineMidCollect = new Pose2d(11, 52, Math.toRadians(90));
+                    Pose2d lineMidCollect = new Pose2d(11, 42, Math.toRadians(90));
                     Pose2d lineTop = new Pose2d(-12, 28, Math.toRadians(90));
-                    Pose2d lineTopCollect = new Pose2d(-12, 49, Math.toRadians(90));
+                    Pose2d lineTopCollect = new Pose2d(-12, 42, Math.toRadians(90));
 
-                    if (robotData.isStartFar()){
+                    if (rrData.getRobotData().isStartFar()){
                         rrData.setBeginPose( new Pose2d(61.065, 13, Math.toRadians(180)));
                         rrData.createDrive();
 
@@ -270,7 +269,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(150))
-                                .splineToSplineHeading(lineBot, Math.toRadians(90));
+                                .splineToSplineHeading(lineBot, Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().actionBuilder(lineBot)
                                 .setTangent(Math.toRadians(90))
@@ -278,11 +277,11 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(lineBotCollect)
                                 .setTangent(Math.toRadians(270))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(340));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(340),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(150))
-                                .splineToLinearHeading(lineMid, Math.toRadians(180));
+                                .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                                 .setTangent(Math.toRadians(90))
@@ -290,11 +289,11 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
                                 .setTangent(Math.toRadians(315))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(315));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(315),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(150))
-                                .splineToLinearHeading(lineTop, Math.toRadians(180));
+                                .splineToLinearHeading(lineTop, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
                                 .setTangent(Math.toRadians(90))
@@ -302,7 +301,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineTopCollect)
                                 .setTangent(Math.toRadians(350))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(340));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(340),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         //Insert Trajectory Paths Here
                         rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -333,7 +332,7 @@ public class AutoBlue extends OpMode {
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(330))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(330));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(45))
@@ -394,24 +393,27 @@ public class AutoBlue extends OpMode {
                 }
 
                 limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
-                robotData.getCarosel().indicatorsInInit();
+                rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 
             telemetry.addLine("Completed Initialization..... \n --------------------------" );
             telemetry.addData("Found Motif", limeLight.foundMotif());
-            if (limeLight.foundMotif()){
+            if (LimeLightVision.isFoundMotif){
+                rrData.getRobotData().getCarosel().updatePattern(LimeLightVision.motifCode);
+                rrData.setCloseSidFoundAT(true);
+                telemetry.addData("Robot Data: ", rrData.getRobotData().getCarosel().getInventory()[0] + ", " + rrData.getRobotData().getCarosel().getInventory()[1] + ", " + rrData.getRobotData().getCarosel().getInventory()[2]);
                 telemetry.addData("Motif Code: ", LimeLightVision.motifCode[0] + ", " + LimeLightVision.motifCode[1] + ", " + LimeLightVision.motifCode[2]);
             }
             telemetry.addData("Pinpoint Yaw: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
             telemetry.addData("Pinpoint Heading (diff): ", rrData.getDrive().getLocalizerPinpoint().getPose().heading);
             telemetry.addData("Pinpoint x: ", rrData.getDrive().getLocalizerPinpoint().getPose().position.x);
-            telemetry.addLine(String.format("Inventory: (%s, %s, %s)", robotData.getCarosel().getInventory()[0], robotData.getCarosel().getInventory()[1], robotData.getCarosel().getInventory()[2]));
-            telemetry.addData("Starting Side", robotData.getStartingSide());
-            telemetry.addData("Starting Position", robotData.getStartingPosition());
+            telemetry.addLine(String.format("Inventory: (%s, %s, %s)", rrData.getRobotData().getCarosel().getInventory()[0], rrData.getRobotData().getCarosel().getInventory()[1], rrData.getRobotData().getCarosel().getInventory()[2]));
+            telemetry.addData("Starting Side", rrData.getRobotData().getStartingSide());
+            telemetry.addData("Starting Position", rrData.getRobotData().getStartingPosition());
 
             telemetry.update();
-        }
 
+        }
     }
 
     @Override
@@ -419,13 +421,13 @@ public class AutoBlue extends OpMode {
         //RobotData.setAutoRun(true);
         //RobotDataV2.createRuntime();
 
-        if (!limeLight.foundMotif()){
+        if (!LimeLightVision.isFoundMotif){
             LimeLightVision.failsafeMotif();
         }
 
         //Far side Auto
 
-        if (robotData.isStartFar()){
+        if (rrData.getRobotData().isStartFar()){
             telemetry.addLine("Beginning Auto: Far Side");
             telemetry.update();
 
@@ -442,7 +444,7 @@ public class AutoBlue extends OpMode {
             telemetry.update();
         }
 
-        rrData.getRobotData().getCarosel().updatePattern(LimeLightVision.motifCode);
+        //rrData.getRobotData().getCarosel().updatePattern(LimeLightVision.motifCode);
 
         Actions.runBlocking(
                 new SequentialAction(
@@ -474,6 +476,7 @@ public class AutoBlue extends OpMode {
                                 rrData.indicatorsUpdate(limeLight),
                                 rrData.telemetryAuto(),
                                 rrData.turretPIDOn(),
+                                rrData.locateAprilTag(limeLight),
 
                                 new SequentialAction(
 
@@ -530,7 +533,7 @@ public class AutoBlue extends OpMode {
                                         ),
                                         rrData.intakeOff(),
                                         rrData.setTurretDone(true),
-                                        rrData.setIsDoneInit(false)
+                                        rrData.setIsDoneInit(true)
                                 )
                         ),
 

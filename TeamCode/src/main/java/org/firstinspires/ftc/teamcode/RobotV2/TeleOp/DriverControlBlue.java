@@ -21,7 +21,6 @@ public class DriverControlBlue extends OpMode {
     //Runs Once on Init
     @Override
     public void init(){
-        RobotConstantsV2.updateCaroselPos(0);
 
         robotData = new RobotDataV2(hardwareMap, telemetry);
         rrData = new RoadRunnerDataV2(robotData);
@@ -31,6 +30,8 @@ public class DriverControlBlue extends OpMode {
         /** Road Runner Init */
         rrData.setBeginPoseFromAuto(); //TODO disablw
         rrData.createDrive();
+
+        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         limelight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
 
@@ -133,7 +134,7 @@ public class DriverControlBlue extends OpMode {
                             robotData.getTurret().aimBall(RobotConstantsV2.FAR_BALL_DISTANCE);
                         }
                         else{
-                            robotData.getTurret().aimBallManual(robotData.getTurret().isFarToggled(),RobotConstantsV2.CLOSE_BALL_DISTANCE);
+                            robotData.getTurret().aimBall(RobotConstantsV2.CLOSE_BALL_DISTANCE);
                         }
                     }
                     else{
@@ -143,9 +144,10 @@ public class DriverControlBlue extends OpMode {
                     //Cycling (Don't want cycling during submodes)
                     if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
                         if (gamepad1.touchpad){
-                            RobotConstantsV2.updateCaroselPos((int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-                            telemetry.addData("Increment:", (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-                            telemetry.addData("Position 1: ", RobotConstantsV2.caroselPos[0]);
+//                            RobotConstantsV2.updateCaroselPos((int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
+//                            telemetry.addData("Increment:", (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
+//                            telemetry.addData("Position 1: ", RobotConstantsV2.caroselPos[0]);
+                            RobotConstantsV2.CAROSEL_TOUCHPAD = (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier);
                             robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
                         }
 
@@ -393,7 +395,9 @@ public class DriverControlBlue extends OpMode {
         /** Emergency Abort */
         if (gamepad1.dpadDownWasPressed()){
             robotData.getDriveTrain().endSubMode();
-            robotData.getCarosel().resetCarosel();
+            //robotData.getCarosel().resetCarosel();
+            RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
+            RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
         }
 
         //-----------------------------------------------------
@@ -425,6 +429,7 @@ public class DriverControlBlue extends OpMode {
             telemetry.addLine("Eyes Closed");
         }
 
+        //telemetry.addLine(String.format("Positions (%f , %f , %f)", RobotConstantsV2.caroselPos[0], RobotConstantsV2.caroselPos[2], RobotConstantsV2.caroselPos[2]));
         telemetry.update();
     }
 

@@ -1,17 +1,20 @@
 package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.graphics.Color;
+import android.icu.number.NumberRangeFormatter;
+
+import androidx.core.graphics.drawable.RoundedBitmapDrawable;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.hardware.AnalogInput;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
-import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -56,9 +59,11 @@ public class RobotDataV2 {
         pendingPosition = true;
         isStartLeft = true;
         isStartFar = true;
-        turret = new Turret(hardwareMap);
-        carosel = new Carosel(hardwareMap);
-        driveTrain = new DriveTrain(hardwareMap);
+
+        turret = new Turret();
+        carosel = new Carosel();
+        driveTrain = new DriveTrain();
+
         runtime = null;
         awaitingTrajectoryGeneration = true;
     }
@@ -101,9 +106,8 @@ public class RobotDataV2 {
     public void updateTelemetry(Telemetry telemetry){
         this.telemetry = telemetry;
     }
-    public boolean isBusy(DcMotorEx motor){
-        //Defaults to 0 if no target pos
-        return Math.abs(motor.getCurrentPosition() - motor.getTargetPosition()) > RobotConstantsV2.MOTOR_TOLERENCE;
+    public Telemetry getTelemetry(){
+        return telemetry;
     }
 
     /** Auto Status */
@@ -138,7 +142,6 @@ public class RobotDataV2 {
 
         return "Right";
     }
-
     public String getStartingSide(){
         if (isStartFar){
             return "Far Side";
@@ -146,15 +149,11 @@ public class RobotDataV2 {
 
         return "Close Side";
     }
-
     public boolean isAwaitingTrajectoryGeneration(){
         return awaitingTrajectoryGeneration;
     }
     public void generatedTrajectory(){
         awaitingTrajectoryGeneration = false;
-    }
-    public Telemetry getTelemetry(){
-        return telemetry;
     }
 
     //----------------------------------------
@@ -182,7 +181,7 @@ public class RobotDataV2 {
 
         /** Constructor */
 
-        public DriveTrain(HardwareMap hardwareMap){
+        public DriveTrain(){ //TODO removed hardware map, hopefully no issue later
 
             /** Init Hardware */
 
@@ -221,14 +220,9 @@ public class RobotDataV2 {
 
         //----------------------------------------
 
-        /** Gamepad */
-        public void setGamepad(Gamepad driver) {
-            this.driver = driver;
-        }
-
         /** Main Modes */
         public void switchMode(){
-            carosel.resetBooleans(); //TODO might be an issue later
+            carosel.resetBooleans();
 
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
                 currentMode = RobotConstantsV2.mainModes[1];
@@ -262,12 +256,7 @@ public class RobotDataV2 {
                 currentSubMode = RobotConstantsV2.subModes[0];
             }
         }
-
-        public void setCurrentSubMode(String submode){
-            currentSubMode = submode;
-        }
-
-        public void requestSortedFire(){ //TODO && LimeLightVision.isFoundMotif
+        public void requestSortedFire(){
             if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
                 turret.deactivateHumanIntakeMode();
                 carosel.activatePatternInProg();
@@ -276,12 +265,20 @@ public class RobotDataV2 {
                 carosel.setMaxShotsPattern();
             }
         }
-
         public void endSubMode(){
             currentSubMode = RobotConstantsV2.subModes[2];
         }
 
         /** Movement */
+        public void powerMotorSafe(DcMotor motor, double targetPower){
+            final double SLEW = 0.2;
+            double currentPower = motor.getPower();
+
+            double desiredChange = targetPower - currentPower;
+            double limitedChange = Math.max(-SLEW, Math.min(desiredChange, SLEW));
+
+            motor.setPower(currentPower += limitedChange);
+        }
         public void omniDrive(){
 
             double x = driver.left_stick_x;
@@ -370,6 +367,11 @@ public class RobotDataV2 {
             }
         }
 
+        /** Gamepad */
+        public void setGamepad(Gamepad driver) {
+            this.driver = driver;
+        }
+
         /** Final Updates */
         public void updateModeColor(){
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
@@ -407,49 +409,33 @@ public class RobotDataV2 {
             telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
             telemetry.addData("Current Mode: ", currentMode);
             telemetry.addData("Current Sub Mode: ", currentSubMode);
-        }
-
-
-        public DcMotor getLFmotor(){
-            return LFmotor;
-        } //TODO Temporarily To Test Auto Park
-
+        } //TODO clean this up
     }
 
     //----------------------------------------
 
     public class PIDControl{
 
-        /** Constants */
-        private double kP = 0.006; //0.71
-        private double kI = 0.0000000001; //0.0005
-        private double kD = 0.00000012; //0.35
-        private double kF = 0.0004; //1
-
-        /** Utility */
+        /** PID For Shooter*/
+        private double kP = 0.006;
+        private double kI = 0.0000000001;
+        private double kD = 0.00000012;
+        private double kF = 0.0004;
         private ElapsedTime PIDTimer = new ElapsedTime();
         private double integralSum = 0;
         private double lastError = 0;
 
-
-
         /** PID for Carosel */
-
-        /** Constants */
-        private double kPC = 3.8;
+        private double kPC = 0.005;
         private double kIC = 0;
-        private double kDC = 0.9;
-        private double kFC = 1;
-
-        /** Utility */
+        private double kDC = 0;
         private ElapsedTime PIDTimerC = new ElapsedTime();
         private double integralSumC = 0;
         private double lastErrorC = 0;
 
-
         //----------------------------------------
 
-        /** Constants */
+        /** Get Constants for Shooter */
         public String getPIDCos(){
             return String.format("kP: %f, kI: %f, kD: %f, kF: %f", kP, kI, kD, kF);
         }
@@ -476,7 +462,7 @@ public class RobotDataV2 {
             return output;
         }
 
-        public double PidCarosel(double current, double desired) {
+        public double PIDCarosel(double current, double desired) {
 
             double currentTimeC = PIDTimer.seconds();
 
@@ -507,16 +493,16 @@ public class RobotDataV2 {
         private Servo shooterServo;
 
         /** Physics Parameters */
-        private final double a = -9.8; //Acceleration m/s^2
+        private final double a = -9.8;
         public double heightOfLauncher = 0.3556; //TODO Update this
-        private final double height = 1.2 - heightOfLauncher; //Meters 1.05
+        private final double height = 1.2 - heightOfLauncher;
         private final double vY = Math.sqrt(2 * -a * height);
         private double vX = 0;
         private double vX0 = 0; //initial vX of the robot at an instant in time
 
         /** Fly Wheel */
-        private final double spinWheelRadius = 0.096/2; //Meters
-        private final double w = 28.0; //Ticks
+        private final double shooterWheelRadius = 0.096/2; //Meters
+        private final double w = 28.0; //Encoder Resolution for 6K RPM
 
         /** Toggle Turret */
         private boolean toggleTurretAim;
@@ -525,7 +511,7 @@ public class RobotDataV2 {
         //----------------------------------------
 
         /** Constructor */
-        private Turret(HardwareMap hardwareMap){
+        private Turret(){
 
             /** Hardware Init */
             shooterMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotor");
@@ -543,7 +529,6 @@ public class RobotDataV2 {
         //----------------------------------------
 
         /** Physics Calculations */
-
         private double getYEquation(double time){
             return vY * time + 0.5 * a * Math.pow(time, 2);
         }
@@ -567,16 +552,16 @@ public class RobotDataV2 {
             return ((disp / getTimeExtrema()) + vX0);
         }
         private double getVelocityTotal(double disp){
-            return Math.sqrt(Math.pow(getVy(),2) + Math.pow(getVx(disp),2)); //TODO Removed Velocity Drag Multiplier and moved to ticks
+            return Math.sqrt(Math.pow(getVy(),2) + Math.pow(getVx(disp),2));
         }
         private double getAngleTotal(double disp){
             return Math.atan2(getVy(),getVx(disp)) * (180 / Math.PI);
         }
-        private double getSpinWheelRadius(){
-            return spinWheelRadius;
+        private double getShooterWheelRadius(){
+            return shooterWheelRadius;
         }
         private double getRadiansPerSecond(double disp){ //From Velocity
-            return getVelocityTotal(disp)/getSpinWheelRadius();
+            return getVelocityTotal(disp)/ getShooterWheelRadius();
         }
         private double getDesiredRPM(double disp){ //From Radians Per SEcond
             return getRadiansPerSecond(disp) * 60 / (2 * Math.PI);
@@ -595,7 +580,7 @@ public class RobotDataV2 {
             return TPSfound;
         }
 
-        /** Toggle Turret Modes */
+        /** Turret Modes */
         public void switchTurretMode(){
             if (toggleTurretAim) toggleTurretAim = false;
             else toggleTurretAim = true;
@@ -610,7 +595,6 @@ public class RobotDataV2 {
         public void toggleTurretFar(boolean isFar){
             this.isFar = isFar;
         }
-
         public boolean isFarToggled(){
             return isFar;
         }
@@ -624,7 +608,7 @@ public class RobotDataV2 {
             shooterMotor.setDirection(DcMotorEx.Direction.REVERSE);
         }
 
-        /** Fly Wheel Power */
+        /** Shooter Power */
         public void powerShooterMotor(double TPS){
             double current = shooterMotor.getVelocity();
             //shooterMotor.setVelocity(PIDShooter(current,TPS));
@@ -659,36 +643,12 @@ public class RobotDataV2 {
             double TPS = getTPS(disp);
             powerShooterMotor(TPS);
         }
-
-        public void aimBallManual(boolean isFarNow, double disp){
-
-            if (isFarNow){
+        public void aimBall(double disp, double TPS){
                 angleRobot(disp);
-                powerShooterMotor(RobotConstantsV2.FAR_TPS);
-            }
-
-            else{
-                angleRobot(disp);
-                double TPS = getTPS(disp);
                 powerShooterMotor(TPS);
-            }
         }
 
         /** Final Updates */
-        public void telemetryTurretBasic(){
-            telemetry.addData("Turret On: ", toggleTurretAim);
-            telemetry.addData("Close Shot: ", !isFar);
-        }
-        public double getTPSError(double disp){
-            return shooterMotor.getVelocity() - getTPS(disp);
-        }
-
-        public double getFarShotTPSError(){
-            return shooterMotor.getVelocity() - RobotConstantsV2.FAR_TPS;
-        }
-        private double getManualTPSError(double TPS){
-            return shooterMotor.getVelocity() - TPS;
-        }
         public void telemetryTurret(double disp){
             telemetry.addLine("Kinematics: \n");
 
@@ -715,6 +675,16 @@ public class RobotDataV2 {
             telemetry.addData("True Servo Angle:",convertDegToServo(getAngleTotal(disp)));
 
         }
+        public void telemetryTurretBasic(){
+            telemetry.addData("Turret On: ", toggleTurretAim);
+            telemetry.addData("Close Shot: ", !isFar);
+        }
+        public double getTPSError(double disp){
+            return shooterMotor.getVelocity() - getTPS(disp);
+        }
+        public double getTPSErrorManual(double TPS){
+            return shooterMotor.getVelocity() - TPS;
+        }
     }
 
     //----------------------------------------
@@ -723,69 +693,85 @@ public class RobotDataV2 {
 
         /** Hardware */
         private DcMotorEx intakeMotor;
-        private DcMotorEx caroselMotor;
         private Servo transferServo;
+        private CRServo caroselServo;
+        private AnalogInput caroselAnalog;
 
 
         /** Sensors */
         private Servo indicatorOne;
         private Servo indicatorTwo;
-        private ColorSensor colorSensor;
-        private DistanceSensor colorSensorDist;
+        private ColorSensor colorSensorFront;
+        private ColorSensor colorSensorBack;
+        private AnalogInput rangerSensor; //TODO might have to use binary if possible
         private DigitalChannel transferBeam;
+
 
         /** Storage */
         private String[] inventory;
         private String[] pattern;
         private int currentCycle;
 
-        /** Carosel Booleans */
+
+        /** Intake  */
         private boolean intakeMotorOn;
-        private boolean transferUp;
         private boolean autoIntakeCooldownActive;
+        private ElapsedTime autoIntakeCoolDown;
         private boolean ejectActive;
 
-        /** Transfer & Shoot */
+        /** Transfer */
+        private boolean transferUp;
+        private ElapsedTime transferCooldown;
+        private boolean transferCooldownActive;
+        private ElapsedTime cycleTransferCooldown; //Can't cycle while transfer acitve
+        private boolean cycleTransferCooldownActive; //TODO honestly forgot what this does
 
-        private ElapsedTime autoIntakeCoolDown;
-
+        /** Submode */
         private boolean cycleInProg;
         private boolean patternInProg;
         private String currentSubModeQueue;
-        private boolean transferCooldownActive;
-        private ElapsedTime transferCooldown;
         private boolean transferInProg;
         private int rapidFireCurrentShotCount;
         private int sortedFireCurrentShotCount;
         private boolean shotSucceed;
         private boolean failsafeSubmode;
         private ElapsedTime failsafeTimer;
-        private ElapsedTime cycleTransferCooldown;
-        private boolean cycleTransferCooldownActive;
         private int maxShots;
+
+        /** PID */
+        private double lastCaroselPosition;
+        private double globalCaroselPosition;
 
         //----------------------------------------
 
         /** Constructor */
-        public Carosel(HardwareMap hardwareMap){
+        public Carosel(){
 
             /** Hardware Init */
 
-            intakeMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"intakeMotor");
-            caroselMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"caroselMotor");
+            caroselServo = hardwareMap.get(CRServo.class,"caroselServo");
+            caroselAnalog = hardwareMap.get(AnalogInput.class,"analogCarosel");
             transferServo = hardwareMap.get(Servo.class,"transferServo");
+
+            /** Sensors Init */
             indicatorOne = hardwareMap.get(Servo.class,"indicatorOne");
             indicatorTwo = hardwareMap.get(Servo.class,"indicatorTwo");
-            colorSensor = hardwareMap.get(ColorSensor.class,"colorSensor");
-            colorSensorDist = (DistanceSensor) colorSensor;
+            colorSensorFront = hardwareMap.get(ColorSensor.class,"colorSensorFront");
+            colorSensorBack  = hardwareMap.get(ColorSensor.class,"colorSensorBack");
+            rangerSensor = hardwareMap.get(AnalogInput.class,"rangerSensor");
             transferBeam = hardwareMap.get(DigitalChannel.class,"transferBeam");
 
+            intakeMotor = (DcMotorEx) hardwareMap.get(DcMotor.class,"intakeMotor");
             intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
-            caroselMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            //caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); //TODO dont zero this when we run auto
-            caroselMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,new PIDFCoefficients(15,0.0001,5,0.2));
+
 
             /** Spindex */
+
+            //TODO I think this becomes the "zero"
+            lastCaroselPosition = caroselAnalog.getMaxVoltage() * RobotConstantsV2.encoderRes; //TODO might need to change logic of this
+            globalCaroselPosition = 0;
+
+            /** Inventory */
             inventory = new String[]{"Empty","Empty","Empty"};
             pattern = new String[]{"Empty","Empty","Empty"};
 
@@ -803,14 +789,15 @@ public class RobotDataV2 {
             failsafeSubmode = false;
             ejectActive = false;
 
+            /** Timers */
             failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
             autoIntakeCoolDown = new ElapsedTime();
             cycleTransferCooldown = new ElapsedTime();
 
+            /** Sub Modes */
             rapidFireCurrentShotCount = 0;
             sortedFireCurrentShotCount = 0;
-            //sortedFireQueue = 0;
         }
 
         //----------------------------------------
@@ -827,12 +814,10 @@ public class RobotDataV2 {
         }
 
         /** Autonomous */
-        public void resetCarosel(){
-            caroselMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        }
         public void setInventoryAuto(){
             inventory = new String[]{"Green","Purple","Purple"};
         }
+
 
         /** Intake */
         public void switchIntake(){
@@ -865,38 +850,21 @@ public class RobotDataV2 {
             intakeMotor.setPower(RobotConstantsV2.INTAKE_OFF);
             intakeMotorOn = false;
         }
-
-        /** Pattern */
-        public void updatePattern(String[] pattern){
-            this.pattern = pattern;
-        }
-        public boolean hasPattern() {
-
-            String[] tempArrayInventory = Arrays.copyOf(inventory,inventory.length);
-            String[] tempArrayPattern = Arrays.copyOf(pattern,pattern.length);
-
-            Arrays.sort(tempArrayInventory);
-            Arrays.sort(tempArrayPattern);
-
-            return Arrays.equals(tempArrayInventory,tempArrayPattern);
-        }
-        public void updateInventory(){
-            //Won't override updates
-            //TODO remove transfer in prog if its buggy
-            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
-                return;
+        public void checkForAutoEject(){
+            if (!isEmptySpot() && !ejectActive){
+                intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
+                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
+                intakeMotorOn = true;
+                ejectActive = true;
             }
-            telemetry.addData("Current Cycle NOW: ", currentCycle);
-            telemetry.addData("Current Inv Spoot NOW: ", inventory[currentCycle]);
-            inventory[currentCycle] = getIntakeColor();
+
+            else if (isEmptySpot()){
+                ejectActive = false;
+            }
         }
-        private void wipeInventory(){
-            inventory = new String[]{"Empty","Empty","Empty"};
-        }
+
 
         /** Transfer */
-        //TODO Make this more clean
-
         public void toggleTransfer(){
             if (!transferUp){
                 inventory[currentCycle] = "Empty";
@@ -918,41 +886,13 @@ public class RobotDataV2 {
             transferUp = false;
             transferCooldownActive = false;
         }
-
-        /** Sub Modes */
-
-        public int getMaxShots(){
-            return maxShots;
-        }
-
-        public void setMaxShotsPattern(){
-
-            int count = 0;
-
-            for (String i:inventory){
-
-                if (i.equals("Green") || i.equals("Purple")){
-                    count++;
-                }
-            }
-
-            maxShots = count;
-        }
-
-        public void resetMaxShotsPattern(){
-            maxShots = 0;
-        }
-
-        public boolean isTransferCooldownActive(){
-            return transferCooldownActive;
-        }
         public void transferStartTimer(){
             if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
                 transferCooldownActive = true;
                 forceTransferUp();
                 transferCooldown.reset();
             }
-        }
+        } //TODO simplify
         public void transferReceiveTimer(){
             if (transferCooldownActive && transferCooldown.milliseconds() > RobotConstantsV2.COOLDOWN_SHOT){
                 forceTransferDown();
@@ -971,18 +911,15 @@ public class RobotDataV2 {
                 startFailsafeSubmode();
             }
         }
-
         public void startTransferCooldown(){
             if (!cycleTransferCooldownActive){
                 cycleTransferCooldown.reset();
                 cycleTransferCooldownActive = true;
             }
         }
-
         public void resetTransferStat(){
             cycleTransferCooldownActive = false;
         }
-
         public void cycleTransferStartTimer(){
             if (transferInProg && cycleTransferCooldownActive && cycleTransferCooldown.milliseconds() > RobotConstantsV2.TRANSFER_COOLDOWN){ //
 
@@ -993,11 +930,34 @@ public class RobotDataV2 {
                 startFailsafeSubmode();
             }
         }
+        public boolean isTransferCooldownActive(){
+            return transferCooldownActive;
+        }
 
+
+        /** Sub Modes */
+        public int getMaxShots(){
+            return maxShots;
+        }
+        public void setMaxShotsPattern(){
+
+            int count = 0;
+
+            for (String i:inventory){
+
+                if (i.equals("Green") || i.equals("Purple")){
+                    count++;
+                }
+            }
+
+            maxShots = count;
+        }
+        public void resetMaxShotsPattern(){
+            maxShots = 0;
+        }
         public void endFailsafeSubmode(){
             failsafeSubmode = false;
         }
-
         public void startFailsafeSubmode(){
             failsafeSubmode = true;
             failsafeTimer.reset();
@@ -1009,11 +969,9 @@ public class RobotDataV2 {
             }
             else return false;
         }
-
         public boolean getTransferInProg(){
             return transferInProg;
         }
-
         public void checkShotSuccess(){
             if (isShotSuccess()){
                 shotSucceed = true;
@@ -1045,8 +1003,6 @@ public class RobotDataV2 {
         public void setSubModeQueue(String queue){
             currentSubModeQueue = queue;
         }
-        //TODO Currently Cycling has wrapping, might need to implement hold system -_- for shortest path
-
         public int getAvailableShots(){
             int shotCounter = 0;
 
@@ -1058,7 +1014,6 @@ public class RobotDataV2 {
 
             return shotCounter;
         }
-
         public int getRapidFireCurrentShotCount(){
             return rapidFireCurrentShotCount;
         }
@@ -1077,6 +1032,70 @@ public class RobotDataV2 {
         public void resetRapidFireCurrentShotCount(){
             rapidFireCurrentShotCount = 0;
         }
+        public boolean isReadyShoot(){
+            return !inventory[currentCycle].equals("Empty");
+        }
+        private String getTransferColor(){
+            return inventory[currentCycle];
+        }
+        public boolean isEmptySpot(){
+            return Arrays.asList(inventory).contains("Empty");
+            //return !(getEmptySpot() == -1);
+        }
+        public boolean isShotSuccess(){
+            return transferBeam.getState();
+        }
+
+        /** Pattern & Inventory*/
+        public void updatePattern(String[] pattern){
+            this.pattern = pattern;
+        }
+        public boolean hasPattern() {
+
+            String[] tempArrayInventory = Arrays.copyOf(inventory,inventory.length);
+            String[] tempArrayPattern = Arrays.copyOf(pattern,pattern.length);
+
+            Arrays.sort(tempArrayInventory);
+            Arrays.sort(tempArrayPattern);
+
+            return Arrays.equals(tempArrayInventory,tempArrayPattern);
+        }
+        public void updateInventory(){
+            //Won't override updates
+            //TODO remove transfer in prog if its buggy
+            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
+                return;
+            }
+            telemetry.addData("Current Cycle NOW: ", currentCycle);
+            telemetry.addData("Current Inv Spoot NOW: ", inventory[currentCycle]);
+            inventory[currentCycle] = getIntakeColor();
+        }
+        private void wipeInventory(){
+            inventory = new String[]{"Empty","Empty","Empty"};
+        }
+        public int getEmptySpot(){
+            return Arrays.asList(inventory).indexOf("Empty");
+        }
+        public int getInvPosition(String color){
+
+            int inventoryCount = 0;
+
+            for (String i: inventory){
+                if (i.equals(color)){
+                    return inventoryCount;
+                }
+                else{
+                    inventoryCount++;
+                }
+            }
+
+            return -1;
+        }
+        public String[] getInventory(){
+            return inventory;
+        }
+
+        /** Cycling */
         public void cycleRapidFire(){
             //Only Activates Once
             //TODO incrementRapidFireCurrentShotCount(); TRANSFER
@@ -1093,39 +1112,9 @@ public class RobotDataV2 {
                 patternInProg = false;
             }
         }
-
-        public boolean isReadyShoot(){
-            return !inventory[currentCycle].equals("Empty");
-        }
-        private String getTransferColor(){ //TODO REDO WITH NEW 4th POS
-            return inventory[currentCycle];
-        }
-        public boolean isEmptySpot(){
-            return Arrays.asList(inventory).contains("Empty");
-            //return !(getEmptySpot() == -1);
-        }
-        public boolean isShotSuccess(){
-            return transferBeam.getState();
-        }
         public void cycleCaroselManual(){
-            cycleCarosel(getNextCycle()); //TODO Previous cycle too
+            cycleCarosel(getNextCycle());
         }
-        public int getEmptySpot(){
-
-//            int index = 0;
-//            for (String i: inventory){
-//                if (i.equals("Empty")){
-//                    return index;
-//                }
-//                index ++;
-//            }
-
-            return Arrays.asList(inventory).indexOf("Empty");
-            //return -1;
-        }
-
-        /** Intake Cycling */
-
         public void autoIntakeCycle(){
             //telemetry.addData("Next Empty Spot: ", getEmptySpot());
             if (!autoIntakeCooldownActive && !transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
@@ -1137,46 +1126,98 @@ public class RobotDataV2 {
         public boolean isAutoIntakeCooldownActive(){
             return autoIntakeCooldownActive;
         }
-
         public void receiveAutoCycleStatus(){
-
             if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.COOLDOWN_INTAKE){
                 autoIntakeCooldownActive = false;
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
         }
-
-        public void checkForAutoEject(){
-            if (!isEmptySpot() && !ejectActive){
-                intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
-                intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
-                intakeMotorOn = true;
-                ejectActive = true;
-            }
-
-            else if (isEmptySpot()){
-                ejectActive = false;
-            }
-        }
-
-
-        /** Spindex */
-
-        public DcMotorEx getCaroselMotor(){
-            return caroselMotor;
-        }
-
         public void cycleCarosel(int desiredCycle){
             if (!transferCooldownActive){
+                int increm = getCycleIncrement(desiredCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD;
                 currentCycle = desiredCycle;
-
-                caroselMotor.setTargetPosition(RobotConstantsV2.caroselPos[desiredCycle]);
-                caroselMotor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
-                //caroselMotor.setVelocity(PidCarosel(caroselMotor.getCurrentPosition(), RobotConstantsV2.caroselPos[desiredCycle]));
-                caroselMotor.setVelocity(RobotConstantsV2.CAROSEL_SPEED);
+                runCaroselToPos(increm);
             }
         }
+        public void cyclePattern(int number){
+            int slot = getInvPosition(pattern[number]);
+            //int trashArtifact = getNearestUselessArtifact();
 
+            if (slot == -1){
+                //if (trashArtifact != -1) cycleCarosel(trashArtifact);
+                if (maxShots > sortedFireCurrentShotCount) cycleCarosel(getNearestArtifact());
+                return;
+            }
+
+            cycleCarosel(slot);
+        }
+
+
+        /** Carosel Servo Logic */
+        public double getCaroselDegrees(){
+            return caroselAnalog.getVoltage() * RobotConstantsV2.encoderRes;
+        }
+        public boolean isBusy(){
+            double targetPos = getCycleIncrement(currentCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD; //TODO test this
+            return Math.abs(targetPos - getCaroselDegrees()) > RobotConstantsV2.CAROSEL_TOLERANCE;
+        }
+        public boolean isCaroselInPlace(){
+            return !isBusy();
+        }
+
+        private void runCaroselToPos(double pos){
+            caroselServo.setPower(-PIDCarosel(globalCaroselPosition,pos));
+        }
+        private double getCaroselIncrement(double diff, double current){
+
+            double step = 0;
+
+            double N = 3.3;
+
+            double diffe = diff - current;
+
+            double modDiff = ((diffe % N) + N) % N;
+
+            if (modDiff > N/ 2){
+                step = (modDiff - N);
+            }
+            else{
+                step = (modDiff);
+            }
+
+            return step * RobotConstantsV2.encoderRes;
+        } //this is used for tracking global encoder pos
+        private void updateCaroselEncoder(){
+            double current = getCaroselDegrees();
+            double in = getCaroselIncrement(current,lastCaroselPosition);
+            lastCaroselPosition = current;
+            globalCaroselPosition += in;
+        }
+        public void resetCaroselGlobalIncrement(){
+            //TODO Find a way to zero it
+            RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
+        }
+        public int getCycleIncrement(int desiredCycle){ //Used for cycle based carosel differences for movement
+
+            int step = 0;
+
+            int N = 3;
+
+            int diff = desiredCycle - currentCycle;
+
+            int modDiff = ((diff % N) + N) % N;
+
+            if (modDiff > N/ 2){
+                step = (modDiff - N) * RobotConstantsV2.CAROSEL_INCREMENT;
+            }
+            else{
+                step = (modDiff) * RobotConstantsV2.CAROSEL_INCREMENT;
+            }
+
+            RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT += step;
+
+            return RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT;
+        }
         private int getNearestUselessArtifact(){
 
             ArrayList<String> tempPattern = new ArrayList<String>();
@@ -1200,7 +1241,6 @@ public class RobotDataV2 {
             return getInvPosition(tempPattern.get(0));
 
         }
-
         private int getNearestArtifact(){
 
             int count = 0;
@@ -1215,18 +1255,6 @@ public class RobotDataV2 {
         }
 
         //TODO not optimized yet for patterns (if had GPE, but pattern PPG, then would shoot GP (not PG for max points)
-        public void cyclePattern(int number){
-            int slot = getInvPosition(pattern[number]);
-            //int trashArtifact = getNearestUselessArtifact();
-
-            if (slot == -1){
-                //if (trashArtifact != -1) cycleCarosel(trashArtifact);
-                if (maxShots > sortedFireCurrentShotCount) cycleCarosel(getNearestArtifact());
-                return;
-            }
-
-            cycleCarosel(slot);
-        }
         private int getNextCycle(){
             if (currentCycle == 0){
                 return 1;
@@ -1241,59 +1269,45 @@ public class RobotDataV2 {
             }
 
             return -1;
-        }
-        public int getInvPosition(String color){
-
-            int inventoryCount = 0;
-
-            for (String i: inventory){
-                if (i.equals(color)){
-                    return inventoryCount;
-                }
-                else{
-                    inventoryCount++;
-                }
-            }
-
-            return -1;
-        }
+        } //TODO can replace this with different method, but it works
         public int getCurrentCycle(){
             return currentCycle;
         }
-        public String[] getInventory(){
-            return inventory;
-        }
 
-        /** Intake Color Detection */
+
+        /** Intake Detection */
         public float[] getHSV(){
 
             float[] hsv = new float[]{0F,0F,0F};
-            Color.RGBToHSV(colorSensor.red()*255,colorSensor.green()*255,colorSensor.blue()*255, hsv);
+            Color.RGBToHSV(colorSensorFront.red()*255, colorSensorFront.green()*255, colorSensorFront.blue()*255, hsv);
             return hsv;
         }
+        public double getRangerDistance(){
+            return (rangerSensor.getVoltage() * RobotConstantsV2.RANGER_EQU_SLOPE + RobotConstantsV2.RANGER_EQU_Y_INT) * RobotConstantsV2.IN_TO_CM;
+        }
         public boolean detectedArtifact(){
-            return colorSensorDist.getDistance(DistanceUnit.CM) < 3 || !inventory[currentCycle].equals("Empty");
-        } //TODO CHECK OVER
+            return (getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_MIN_THRESHOLD && getRangerDistance() < RobotConstantsV2.RANGER_DETECTION_MAX_THRESHOLD) || !inventory[currentCycle].equals("Empty");
+        }
         public String getIntakeColor() { //TODO make these static variables for tuning
             if (detectedArtifact()) {
                 float[] HSV = getHSV();
 
-                if (HSV[0] < 200 && HSV[1] >= 0.55){
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
                     return "Green";
                 }
-                else if (HSV[0] >= 200 && HSV[1] < 0.55){
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIDDLE_S){
                     return "Purple";
                 }
             }
 
             return "Empty";
         }
+
+        /** Indicator Lights */
         public void indicatorsInInit(){
             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_ORANGE);
             indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_ORANGE);
         }
-
-        /** Indicator Lights */
         public void updateIndicators(String mode, double disp, LimeLightVision limelight){
 
             switch (mode){
@@ -1415,11 +1429,6 @@ public class RobotDataV2 {
 
             }
 
-        }
-
-        /** Magnetic Limit Switch */
-        public boolean isCaroselInPlace(){
-            return !isBusy(caroselMotor);
         }
 
         /** Final Updates */

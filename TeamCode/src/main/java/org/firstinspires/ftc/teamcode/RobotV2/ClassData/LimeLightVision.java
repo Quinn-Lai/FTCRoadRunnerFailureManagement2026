@@ -92,7 +92,7 @@ public class LimeLightVision {
         /** Alliance */
         this.alliance = alliance;
 
-        if (alliance.equals("blue")) limelight.pipelineSwitch(0);
+        if (this.alliance.equals("blue")) limelight.pipelineSwitch(0);
         else limelight.pipelineSwitch(1);
 
         /** Variable Init */
@@ -226,7 +226,7 @@ public class LimeLightVision {
     }
 
     public static void failsafeMotif(){
-        motifCode = new String[]{"Purple","Purple","Green"};
+        motifCode = new String[]{"Green","Purple","Purple"};
     }
 
 //    public String[] getMotifCode(){

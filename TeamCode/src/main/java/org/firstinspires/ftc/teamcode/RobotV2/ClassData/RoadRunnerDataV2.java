@@ -37,6 +37,7 @@ public class RoadRunnerDataV2{
     private boolean isDone;
     private boolean isDoneInit;
     private boolean closeSideFoundAT;
+    private Action currentTeleOpAction;
 
 //    public RoadRunnerData(HardwareMap hardwareMap) {
 //        robot = new RobotData(hardwareMap);
@@ -59,6 +60,8 @@ public class RoadRunnerDataV2{
         parkingSpotBlue = new Pose2d(36.7,32.5,0);
         parkingSpotRed= new Pose2d(36.7,-32.5,0);
         failsafeTimer = new ElapsedTime();
+
+        currentTeleOpAction = null;
     }
 
     //----------------------------------------
@@ -135,32 +138,64 @@ public class RoadRunnerDataV2{
 
     //Create paths
 
+
+
+
+    public void setCurrentTeleOpAction(Action a){
+        currentTeleOpAction = a;
+    }
+
+    public void endTeleOpAction(){
+        currentTeleOpAction = null;
+    }
+
+    //TODO Attempted to run trajectory as just an action
     public Action getParkingTrajectory(String alliance){
 
-        TrajectoryActionBuilder park;
+        Action park;
 
         if (alliance.equals("blue")){
 
             park = getDrive().actionBuilder(RobotConstantsV2.blueCorner)
                     .setTangent(Math.toRadians(225))
-                    .splineToConstantHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270));
+                    .splineToConstantHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270))
+                    .build();
         }
         else{
             park = getDrive().actionBuilder(RobotConstantsV2.redCorner)
                     .setTangent(Math.toRadians(135))
-                    .splineToConstantHeading(RobotConstantsV2.parkingRed,Math.toRadians(90));
+                    .splineToConstantHeading(RobotConstantsV2.parkingRed,Math.toRadians(90))
+                    .build();
         }
 
-        return park.build();
+        return park;
     }
     public Action getAlignTrajectory(double limelightYaw){
 
-        TrajectoryActionBuilder park = getDrive().actionBuilder(new Pose2d(0,0,0))
-                .turn(Math.toRadians(limelightYaw));
+        Action park = getDrive().actionBuilder(new Pose2d(0,0,0))
+                .turn(Math.toRadians(limelightYaw))
+                .build();
 
-        return park.build();
+        return park;
 
     }
+
+    public void runCurrentTeleOpAction(){
+
+        if (currentTeleOpAction != null){
+            if (!currentTeleOpAction.run(new TelemetryPacket())){
+                currentTeleOpAction = null;
+            }
+        }
+
+        else{
+            //TODO run DT
+        }
+
+    }
+
+
+
 
 
     public void requestPark(String alliance){
@@ -308,7 +343,10 @@ public class RoadRunnerDataV2{
         return new IntakeOff();
     }
 
-    //TODO run this in parrallel
+    public Action quickUpdateInventory(){
+        return new InstantAction(()->robotData.getCarosel().updateInventory());
+    }
+
     public class CheckAutoIntake implements Action{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
@@ -316,9 +354,14 @@ public class RoadRunnerDataV2{
             robotData.getCarosel().autoIntakeCycle();
             robotData.getCarosel().receiveAutoCycleStatus();
 
-            //TODO failsafe for auto cycle if not received
+            //robotData.getCarosel().isAutoIntakeCooldownActive()
 
-            return (robotData.getCarosel().isEmptySpot() || robotData.getCarosel().isAutoIntakeCooldownActive()) && failsafeTimer.milliseconds() < RobotConstantsV2.AUTO_FAILSAFE_TIMER;
+            if (failsafeTimer.milliseconds() > RobotConstantsV2.AUTO_FAILSAFE_TIMER){
+                return false;
+            }
+
+             //&& failsafeTimer.milliseconds() < RobotConstantsV2.AUTO_FAILSAFE_TIMER
+            return (robotData.getCarosel().isEmptySpot() || robotData.getCarosel().isAutoIntakeCooldownActive());
         }
     }
     public Action checkAutoIntake() {
@@ -341,6 +384,12 @@ public class RoadRunnerDataV2{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
 
+            if (robotData.getCarosel().getSortedFireCurrentShotCount() >= robotData.getCarosel().getMaxShots()){
+                robotData.getCarosel().transferReceiveTimer();
+                robotData.getCarosel().resetSortedFireCurrentShotCount();
+                return false;
+            }
+
             switch (robotData.getCarosel().getCurrentSubModeQueue()){
                 case ("cycle"):
 
@@ -361,10 +410,24 @@ public class RoadRunnerDataV2{
 
                 case ("transfer"):
 
-                    robotData.getCarosel().startTransferCooldown();
-                    robotData.getCarosel().cycleTransferStartTimer();
-                    robotData.getCarosel().checkShotSuccess();
+                    boolean status;
 
+                    if (robotData.getTurret().isFarToggled()){
+                        status = Math.abs(robotData.getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < robotData.getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+
+                    }
+
+
+                    else{
+                        status = Math.abs(robotData.getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < robotData.getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+                    }
+
+                    if (status){
+                        robotData.getCarosel().startTransferCooldown();
+                        robotData.getCarosel().cycleTransferStartTimer();
+                        robotData.getCarosel().checkShotSuccess();
+
+                    }
                     if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
                         robotData.getCarosel().endFailsafeSubmode();
                         robotData.getCarosel().incrementSortedFireCurrentShotCount();
@@ -382,11 +445,7 @@ public class RoadRunnerDataV2{
             robotData.getCarosel().transferReceiveTimer();
 
             //failsafeTimer.milliseconds() > RobotConstantsV2.AUTO_FAILSAFE_TIMER
-            if (robotData.getCarosel().getSortedFireCurrentShotCount() >= robotData.getCarosel().getMaxShots()){
-                robotData.getCarosel().transferReceiveTimer();
-                robotData.getCarosel().resetSortedFireCurrentShotCount();
-                return false;
-            }
+
 
             return true;
         }
@@ -416,6 +475,75 @@ public class RoadRunnerDataV2{
         return new RequestPatternFire();
     }
 
+    public class RequestRapidFire implements Action{
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+
+            robotData.getCarosel().activateCycleInProg();
+            robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+
+            return false;
+        }
+    }
+
+    public Action requestRapidFire() {
+        return new RequestRapidFire();
+    }
+
+    public class RapidFire implements Action{
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+
+            if (robotData.getCarosel().getRapidFireCurrentShotCount() >= RobotConstantsV2.RAPID_FIRE_MAX_SHOTS) {
+                robotData.getCarosel().resetRapidFireCurrentShotCount();
+                return false;
+            }
+
+            switch (robotData.getCarosel().getCurrentSubModeQueue()){
+                case ("cycle"):
+
+                    if (!robotData.getCarosel().isTransferCooldownActive()){
+                        robotData.getCarosel().cycleRapidFire();
+
+                        if (robotData.getCarosel().isCaroselInPlace()){
+                            robotData.getCarosel().resetTransferStat();
+                            robotData.getCarosel().resetShotSuccess();
+                            robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                            robotData.getCarosel().activateTransferInProg();
+                        }
+                    }
+
+                    break;
+
+                case ("transfer"):
+                    robotData.getCarosel().startTransferCooldown();
+                    robotData.getCarosel().cycleTransferStartTimer();
+                    robotData.getCarosel().checkShotSuccess();
+
+                    if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
+                        robotData.getCarosel().endFailsafeSubmode();
+                        robotData.getCarosel().incrementRapidFireCurrentShotCount();
+                        robotData.getCarosel().activateCycleInProg();
+                        robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                        break;
+                    }
+
+                    break;
+
+                default:
+                    break;
+
+            }
+
+            return true;
+        }
+    }
+
+    public Action rapidFire() {
+        return new RapidFire();
+    }
+
+
 
     public class TurretPIDOn implements Action{
         @Override
@@ -432,7 +560,7 @@ public class RoadRunnerDataV2{
             //robotData.getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE) < robotData.getTurret().getTPS(RobotConstantsV2.FAR_TPS) * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD
             return !isDone;
         }
-    } //TODO reset pattenr fire method
+    }
 
     public Action turretPIDOn() {
         return new TurretPIDOn();
@@ -475,7 +603,7 @@ public class RoadRunnerDataV2{
             getRobotData().getCarosel().updateIndicators("manual",RobotConstantsV2.FAR_BALL_DISTANCE,limeLight);
             return !isDoneInit;
         }
-    } //TODO reset pattenr fire method
+    }
 
     public Action indicatorsUpdate(LimeLightVision limelight) {
         return new IndicatorUpdate(limelight);
@@ -505,7 +633,11 @@ public class RoadRunnerDataV2{
 
             return status;
         }
-    } //TODO reset pattenr fire method
+    }
+
+    public Action setCloseSideFoundATHere(boolean AT){
+        return new InstantAction(() -> closeSideFoundAT = AT);
+    }
 
     public Action updatePattern(String[] pattern){
         return new InstantAction(() -> robotData.getCarosel().updatePattern(pattern));
@@ -558,6 +690,10 @@ public class RoadRunnerDataV2{
     }
 
 
+    public void setCloseSidFoundAT(boolean AT){
+        closeSideFoundAT = AT;
+    }
+
     public class LocateAprilTag implements Action{ //Creates Class, so each class is represented as an Action
 
         private LimeLightVision limeLightVision;
@@ -569,10 +705,12 @@ public class RoadRunnerDataV2{
         public boolean run(@NonNull TelemetryPacket packet) {
             //Commands & Methods Go Here
 
-            limeLightVision.updateMotifCode();
-
-            if (LimeLightVision.isFoundMotif){
+            if (!LimeLightVision.isFoundMotif){
+                limeLightVision.updateMotifCode();
                 robotData.getCarosel().updatePattern(LimeLightVision.motifCode);
+            }
+
+            else{
                 closeSideFoundAT = true;
             }
 
@@ -583,28 +721,13 @@ public class RoadRunnerDataV2{
         return new LocateAprilTag(limeLightVision); //Constructor
     }
 
-
-    public class Reminder implements Action{ //Creates Class, so each class is represented as an Action
-
-        private double x;
-        public Reminder(double x){
-            this.x = x;
-        }
-
-        @Override
-        public boolean run(@NonNull TelemetryPacket packet) {
-            //Commands & Methods Go Here
-
-            robotData.getDriveTrain().getLFmotor().setPower(x);
-
-            return false;
-        }
+    public Action updateCode(LimeLightVision limeLightVision){
+        return new InstantAction(limeLightVision::updateMotifCode);
     }
-    public Action doReminder(double x) { //Creates method to return the action as an object
-            return new Reminder(x); //Constructor
+
+    public Action updatePattern(){
+        return new InstantAction(()-> robotData.getCarosel().updatePattern(LimeLightVision.motifCode));
     }
-    //Action test = new Reminder(1); //Does the same thing as above
-    //(Modified) Sequential Robot Trajectories Using Methods
 
     public SequentialAction getSequentialConcept(){
 
