@@ -1,9 +1,6 @@
 package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.graphics.Color;
-import android.icu.number.NumberRangeFormatter;
-
-import androidx.core.graphics.drawable.RoundedBitmapDrawable;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.AnalogInput;
@@ -12,6 +9,7 @@ import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
@@ -625,8 +623,8 @@ public class RobotDataV2 {
         /** Hood */
         private double convertDegToServo(double angle){
 
-            if (angle > RobotConstantsV2.MAX_HOOD_ANGLE) return 0.2;
-            else if (angle < RobotConstantsV2.MIN_HOOD_ANGLE) return 0.9;
+            if (angle > RobotConstantsV2.MAX_HOOD_ANGLE) return RobotConstantsV2.MAX_HOOD_ANGLE_POS;
+            else if (angle < RobotConstantsV2.MIN_HOOD_ANGLE) return RobotConstantsV2.MIN_HOOD_ANGLE_POS;
 
             return (double) Math.round((-0.0388889 * angle + 2.72778) * 1000) / 1000;
         }
@@ -703,6 +701,8 @@ public class RobotDataV2 {
         private Servo indicatorTwo;
         private ColorSensor colorSensorFront;
         private ColorSensor colorSensorBack;
+        private DistanceSensor colorSensorFrontDist;
+        private DistanceSensor colorSensorBackDist;
         private AnalogInput rangerSensor; //TODO might have to use binary if possible
         private DigitalChannel transferBeam;
 
@@ -723,8 +723,6 @@ public class RobotDataV2 {
         private boolean transferUp;
         private ElapsedTime transferCooldown;
         private boolean transferCooldownActive;
-        private ElapsedTime cycleTransferCooldown; //Can't cycle while transfer acitve
-        private boolean cycleTransferCooldownActive; //TODO honestly forgot what this does
 
         /** Submode */
         private boolean cycleInProg;
@@ -758,6 +756,9 @@ public class RobotDataV2 {
             indicatorTwo = hardwareMap.get(Servo.class,"indicatorTwo");
             colorSensorFront = hardwareMap.get(ColorSensor.class,"colorSensorFront");
             colorSensorBack  = hardwareMap.get(ColorSensor.class,"colorSensorBack");
+            colorSensorFrontDist = hardwareMap.get(DistanceSensor.class,"colorSensorFront");
+            colorSensorBackDist = hardwareMap.get(DistanceSensor.class,"colorSensorBack");
+
             rangerSensor = hardwareMap.get(AnalogInput.class,"rangerSensor");
             transferBeam = hardwareMap.get(DigitalChannel.class,"transferBeam");
 
@@ -777,7 +778,6 @@ public class RobotDataV2 {
 
             /** Variable Init */
 
-            cycleTransferCooldownActive = false;
             autoIntakeCooldownActive = false;
             cycleInProg = false;
             patternInProg = false;
@@ -793,7 +793,6 @@ public class RobotDataV2 {
             failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
             autoIntakeCoolDown = new ElapsedTime();
-            cycleTransferCooldown = new ElapsedTime();
 
             /** Sub Modes */
             rapidFireCurrentShotCount = 0;
@@ -803,7 +802,6 @@ public class RobotDataV2 {
         //----------------------------------------
 
         public void resetBooleans(){
-            cycleTransferCooldownActive = false;
             autoIntakeCooldownActive = false;
             cycleInProg = false;
             patternInProg = false;
@@ -862,12 +860,15 @@ public class RobotDataV2 {
                 ejectActive = false;
             }
         }
+        public boolean isIntakeMotorOn(){
+            return intakeMotorOn;
+        }
 
 
         /** Transfer */
         public void toggleTransfer(){
             if (!transferUp){
-                inventory[currentCycle] = "Empty";
+                //inventory[currentCycle] = "Empty";
                 transferServo.setPosition(RobotConstantsV2.TRANSFER_UP);
                 transferUp = true;
             }
@@ -877,7 +878,7 @@ public class RobotDataV2 {
             }
         }
         public void forceTransferUp(){
-            inventory[currentCycle] = "Empty";
+            //inventory[currentCycle] = "Empty";
             transferServo.setPosition(RobotConstantsV2.TRANSFER_UP);
             transferUp = true;
         }
@@ -904,25 +905,6 @@ public class RobotDataV2 {
         }
         public void subModeTransferStartTimer(){
             if (transferInProg){ //
-                transferInProg = false;
-                transferCooldownActive = true;
-                forceTransferUp();
-                transferCooldown.reset();
-                startFailsafeSubmode();
-            }
-        }
-        public void startTransferCooldown(){
-            if (!cycleTransferCooldownActive){
-                cycleTransferCooldown.reset();
-                cycleTransferCooldownActive = true;
-            }
-        }
-        public void resetTransferStat(){
-            cycleTransferCooldownActive = false;
-        }
-        public void cycleTransferStartTimer(){
-            if (transferInProg && cycleTransferCooldownActive && cycleTransferCooldown.milliseconds() > RobotConstantsV2.TRANSFER_COOLDOWN){ //
-
                 transferInProg = false;
                 transferCooldownActive = true;
                 forceTransferUp();
@@ -967,7 +949,7 @@ public class RobotDataV2 {
                 failsafeSubmode = false;
                 return true;
             }
-            else return false;
+            return false;
         }
         public boolean getTransferInProg(){
             return transferInProg;
@@ -975,6 +957,7 @@ public class RobotDataV2 {
         public void checkShotSuccess(){
             if (isShotSuccess()){
                 shotSucceed = true;
+                inventory[currentCycle] = "Empty";
             }
         }
         public void resetShotSuccess(){
@@ -1045,6 +1028,9 @@ public class RobotDataV2 {
         public boolean isShotSuccess(){
             return transferBeam.getState();
         }
+        public void removeArtifactPostShot(){ //TODO beta test this
+            if (isShotSuccess()) inventory[currentCycle] = "Empty";
+        }
 
         /** Pattern & Inventory*/
         public void updatePattern(String[] pattern){
@@ -1066,9 +1052,13 @@ public class RobotDataV2 {
             if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
                 return;
             }
-            telemetry.addData("Current Cycle NOW: ", currentCycle);
-            telemetry.addData("Current Inv Spoot NOW: ", inventory[currentCycle]);
-            inventory[currentCycle] = getIntakeColor();
+
+            if (detectedArtifactBack()){
+                inventory[currentCycle] = getColorBack();
+                return;
+            }
+
+            if (detectedArtifactFront()) inventory[currentCycle] = getColorFront();
         }
         private void wipeInventory(){
             inventory = new String[]{"Empty","Empty","Empty"};
@@ -1127,7 +1117,7 @@ public class RobotDataV2 {
             return autoIntakeCooldownActive;
         }
         public void receiveAutoCycleStatus(){
-            if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.COOLDOWN_INTAKE){
+            if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.AUTO_CYCLE_COOLDOWN){
                 autoIntakeCooldownActive = false;
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
@@ -1164,7 +1154,6 @@ public class RobotDataV2 {
         public boolean isCaroselInPlace(){
             return !isBusy();
         }
-
         private void runCaroselToPos(double pos){
             caroselServo.setPower(-PIDCarosel(globalCaroselPosition,pos));
         }
@@ -1187,7 +1176,7 @@ public class RobotDataV2 {
 
             return step * RobotConstantsV2.encoderRes;
         } //this is used for tracking global encoder pos
-        private void updateCaroselEncoder(){
+        public void updateCaroselEncoder(){
             double current = getCaroselDegrees();
             double in = getCaroselIncrement(current,lastCaroselPosition);
             lastCaroselPosition = current;
@@ -1276,10 +1265,16 @@ public class RobotDataV2 {
 
 
         /** Intake Detection */
-        public float[] getHSV(){
+        public float[] getHSVFront(){
 
             float[] hsv = new float[]{0F,0F,0F};
             Color.RGBToHSV(colorSensorFront.red()*255, colorSensorFront.green()*255, colorSensorFront.blue()*255, hsv);
+            return hsv;
+        }
+        public float[] getHSVBack(){
+
+            float[] hsv = new float[]{0F,0F,0F};
+            Color.RGBToHSV(colorSensorBack.red()*255, colorSensorBack.green()*255, colorSensorBack.blue()*255, hsv);
             return hsv;
         }
         public double getRangerDistance(){
@@ -1288,9 +1283,9 @@ public class RobotDataV2 {
         public boolean detectedArtifact(){
             return (getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_MIN_THRESHOLD && getRangerDistance() < RobotConstantsV2.RANGER_DETECTION_MAX_THRESHOLD) || !inventory[currentCycle].equals("Empty");
         }
-        public String getIntakeColor() { //TODO make these static variables for tuning
+        public String getColorBack() { //TODO here issue with megging
             if (detectedArtifact()) {
-                float[] HSV = getHSV();
+                float[] HSV = getHSVBack();
 
                 if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
                     return "Green";
@@ -1302,6 +1297,28 @@ public class RobotDataV2 {
 
             return "Empty";
         }
+
+        public boolean detectedArtifactFront(){
+            return colorSensorFrontDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD;
+        }
+        public boolean detectedArtifactBack(){
+            return colorSensorBackDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD;
+        }
+        public String getColorFront(){
+            if (detectedArtifactFront()) {
+                float[] HSV = getHSVFront();
+
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
+                    return "Green";
+                }
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIDDLE_S){
+                    return "Purple";
+                }
+            }
+
+            return "Empty";
+        }
+
 
         /** Indicator Lights */
         public void indicatorsInInit(){
@@ -1317,12 +1334,10 @@ public class RobotDataV2 {
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
                     }
 
-                    //Motor Speed (Don't Need Multiple Colors)
                     telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
                     telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
                     telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
 
-                    //TODO maybe another color for when no vision but can shoot
                     if (!limelight.getResults().isValid() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
@@ -1332,18 +1347,17 @@ public class RobotDataV2 {
 
                     //Current Color
 
-                    //Live View (also invententory for redundency
-                    if (getIntakeColor().equals("Purple")){
+                    if (inventory[currentCycle].equals("Purple")){
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
                     }
-                    else if (getIntakeColor().equals("Green")){
+                    else if (inventory[currentCycle].equals("Green")){
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
                     }
                     else{
-                        if (inventory[currentCycle].equals("Purple")){
+                        if (getColorBack().equals("Purple")){
                             indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
                         }
-                        else if (inventory[currentCycle].equals("Green")){
+                        else if (getColorBack().equals("Green")){
                             indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
                         }
                         else{
@@ -1355,13 +1369,8 @@ public class RobotDataV2 {
 
                 case("manual"):
 
+                    //TODO keep these separate in case the calcs start to diverge
                     if (turret.isFarToggled()){
-                        //disp = RobotConstantsV2.FAR_BALL_DISTANCE;
-
-//                        if (turret.getFarShotTPSError() > RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MAX_SPEED_THRESHOLD || turret.getFarShotTPSError() < RobotConstantsV2.FAR_TPS * RobotConstantsV2.SHOOTER_MIN_SPEED_THRESHOLD){
-//                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
-//                        }
-
                         telemetry.addData("Distance: ", disp);
                         telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
                         telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
@@ -1375,10 +1384,9 @@ public class RobotDataV2 {
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
                         }
                     }
-
                     else{
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
-                        //WOrks because using TPS here
+
                         if (Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
@@ -1387,14 +1395,9 @@ public class RobotDataV2 {
                         }
                     }
 
-
-                    //Current Color
-                    //Live View (also invententory for redundency
-                    if (getIntakeColor().equals("Purple")){
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
-                    }
-                    else if (getIntakeColor().equals("Green")){
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                    //Current Color (Binary)
+                    if (detectedArtifact()){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_BLUE);
                     }
                     else{
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
@@ -1406,12 +1409,10 @@ public class RobotDataV2 {
 
                     indicatorOne.setPosition(RobotConstantsV2.INDICATOR_ORANGE); //Shows that Human Player Mode
 
-                    //Double Check Make Sure it empty currently
                     if (!isEmptySpot()){
-                        //Inventory is Full
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_RED);
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_ORANGE);
                     }
-                    else if (!detectedArtifact() || inventory[currentCycle].equals("Empty") || isCaroselInPlace()){
+                    else if ((!detectedArtifact() || inventory[currentCycle].equals("Empty")) && isCaroselInPlace()){
                         indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
                     }
                     else{
@@ -1435,10 +1436,14 @@ public class RobotDataV2 {
         public void telemetryCarosel(){
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
             telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern[0], pattern[1], pattern[2]));
-            float[] HSV = getHSV();
-            telemetry.addLine(String.format("HSV: (%.5f, %.5f, %.5f)", HSV[0], HSV[1], HSV[2]));
+            float[] HSVFront = getHSVFront();
+            telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
+
+            float[] HSVBack = getHSVBack();
+            telemetry.addLine(String.format("HSV Back: (%.5f, %.5f, %.5f)", HSVBack[0], HSVBack[1], HSVBack[2]));
+
             telemetry.addData("Current Cycle: ", currentCycle);
-            telemetry.addData("Identified Color: ", getIntakeColor());
+            telemetry.addData("Identified Color: ", getColorBack());
             telemetry.addData("Inventory Current: ", inventory[currentCycle]);
             telemetry.addData("Has Pattern in Inventory: ", hasPattern());
         }

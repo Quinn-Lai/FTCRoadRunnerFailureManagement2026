@@ -14,8 +14,9 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RoadRunnerDataV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
+
 @Autonomous
-public class AutoRed extends OpMode {
+public class Auto extends OpMode {
 
     //Data Classes
     private LimeLightVision limeLight;
@@ -37,7 +38,7 @@ public class AutoRed extends OpMode {
 
         rrData.getRobotData().getCarosel().forceTransferDown();
         rrData.getRobotData().getCarosel().setInventoryAuto();
-        rrData.getRobotData().getCarosel().resetCarosel();
+        rrData.getRobotData().getCarosel().indicatorsInInit();
     }
 
     @Override
@@ -96,11 +97,11 @@ public class AutoRed extends OpMode {
                 if (rrData.getRobotData().isStartedLeft()){
 
                     Pose2d lineBot = new Pose2d(33, -28, Math.toRadians(270));
-                    Pose2d lineBotCollect = new Pose2d(33, -40, Math.toRadians(270));
+                    Pose2d lineBotCollect = new Pose2d(33, -42, Math.toRadians(270));
                     Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
-                    Pose2d lineMidCollect = new Pose2d(11, -40, Math.toRadians(270));
+                    Pose2d lineMidCollect = new Pose2d(11, -42, Math.toRadians(270));
                     Pose2d lineTop = new Pose2d(-12, -28, Math.toRadians(270));
-                    Pose2d lineTopCollect = new Pose2d(-12, -40, Math.toRadians(270));
+                    Pose2d lineTopCollect = new Pose2d(-12, -42, Math.toRadians(270));
 
                     //Far Side
                     if (rrData.getRobotData().isStartFar()){
@@ -183,7 +184,7 @@ public class AutoRed extends OpMode {
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(30))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(30));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(315))
@@ -243,11 +244,11 @@ public class AutoRed extends OpMode {
                 //Trajectory Right
                 else{
                     Pose2d lineBot = new Pose2d(33, 28, Math.toRadians(90));
-                    Pose2d lineBotCollect = new Pose2d(33, 40, Math.toRadians(90));
+                    Pose2d lineBotCollect = new Pose2d(33, 42, Math.toRadians(90));
                     Pose2d lineMid = new Pose2d(11, 28, Math.toRadians(90));
-                    Pose2d lineMidCollect = new Pose2d(11, 40, Math.toRadians(90));
+                    Pose2d lineMidCollect = new Pose2d(11, 42, Math.toRadians(90));
                     Pose2d lineTop = new Pose2d(-12, 28, Math.toRadians(90));
-                    Pose2d lineTopCollect = new Pose2d(-12, 40, Math.toRadians(90));
+                    Pose2d lineTopCollect = new Pose2d(-12, 42, Math.toRadians(90));
 
                     if (rrData.getRobotData().isStartFar()){
                         rrData.setBeginPose( new Pose2d(61.065, 13, Math.toRadians(180)));
@@ -330,7 +331,7 @@ public class AutoRed extends OpMode {
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(330))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(330));
+                                .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(45))

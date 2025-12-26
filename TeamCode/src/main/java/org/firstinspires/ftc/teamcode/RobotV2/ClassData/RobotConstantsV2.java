@@ -23,11 +23,10 @@ public class RobotConstantsV2 {
     public static final int ANGLE_BONUS = 21;
 
     /** Transfer */
-    public static final int TRANSFER_COOLDOWN = 300; //TODO honestly forgot what this was for
     public static final int COOLDOWN_SHOT = 300; //Transfer Shot
     public static final double TRANSFER_UP = 0.6;
     public static final double TRANSFER_DOWN = 0.87;
-    public static final int COOLDOWN_INTAKE = 500;
+    public static final int AUTO_CYCLE_COOLDOWN = 0;
 
 
     /** Intake */
@@ -39,6 +38,7 @@ public class RobotConstantsV2 {
     public static final double IN_TO_CM = 2.54;
     public static final int RANGER_DETECTION_MIN_THRESHOLD = 3;
     public static final int RANGER_DETECTION_MAX_THRESHOLD = 5; //TODO tune these
+    public static final int COLOR_SENSOR_DIST_THRESHOLD = 3;
 
 
     /** Modes */
@@ -56,6 +56,8 @@ public class RobotConstantsV2 {
     public static final double FAR_TPS = 1600;
     public static final double MAX_HOOD_ANGLE = 65.0;
     public static final double MIN_HOOD_ANGLE = 51.3;
+    public static final double MIN_HOOD_ANGLE_POS = 0.732;
+    public static final double MAX_HOOD_ANGLE_POS = 0.2;
     public static final double SHOOTER_SPEED_THRESHOLD = 0.03; //Ready if shooter is within 3% of intended speed
 
     /** Limelight Parameters */

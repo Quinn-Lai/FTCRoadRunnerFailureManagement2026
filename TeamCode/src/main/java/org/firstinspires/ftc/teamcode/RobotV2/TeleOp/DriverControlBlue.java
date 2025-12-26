@@ -13,10 +13,9 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 public class DriverControlBlue extends OpMode {
 
     //Data Classes
-    private RoadRunnerDataV2 rrData;  //Road Runner Implementation
-    private RobotDataV2 robotData;       //Basic Robot Mechanics
-    private LimeLightVision limelight;
-    private Action parkTemp;
+    private RoadRunnerDataV2 rrData;       //Road Runner Implementation
+    private RobotDataV2 robotData;         //Basic Robot Mechanics
+    private LimeLightVision limelight;     //Lime Light Implementation
 
     //Runs Once on Init
     @Override
@@ -28,7 +27,7 @@ public class DriverControlBlue extends OpMode {
         limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
 
         /** Road Runner Init */
-        rrData.setBeginPoseFromAuto(); //TODO disablw
+        rrData.setBeginPoseFromAuto();
         rrData.createDrive();
 
         RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
@@ -45,7 +44,7 @@ public class DriverControlBlue extends OpMode {
     public void init_loop(){
         telemetry.addLine("Waiting for Round to Start");
 
-        if (limelight.getResults().isValid()){
+        if (limelight.canSeeSomeAT()){
             limelight.telemetryLimeLight();
             robotData.getTurret().telemetryTurret(limelight.getDisp());
         }
@@ -65,12 +64,12 @@ public class DriverControlBlue extends OpMode {
     @Override
     public void loop(){
 
-        limelight.updateOrientationIMU();
-
-        /** First Updates */
-
-        robotData.updateTelemetry(telemetry);
+        /** Important First Updates */
         robotData.getDriveTrain().setGamepad(gamepad1);
+        robotData.getCarosel().updateCaroselEncoder();
+        limelight.updateOrientationIMU();
+        robotData.updateTelemetry(telemetry);
+        robotData.getCarosel().removeArtifactPostShot();
 
         /** Main Mode */
         switch (robotData.getDriveTrain().getCurrentMode()){
@@ -82,9 +81,8 @@ public class DriverControlBlue extends OpMode {
 
                     //Passive Auto Aim
                     if (robotData.getTurret().isToggleTurretAim()){
-                        if (limelight.getResults().isValid()){
+                        if (limelight.canSeeSomeAT()){
                             robotData.getTurret().aimBall(limelight.getDisp());
-                            robotData.updateTelemetry(telemetry);
                             robotData.getTurret().telemetryTurret(limelight.getDisp());
                         }
                         else{
@@ -101,14 +99,16 @@ public class DriverControlBlue extends OpMode {
                         robotData.getDriveTrain().requestSortedFire();
                     }
 
-
                     //Auto Cycling (Don't want it cycling during submodes)
                     if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
 
-                        robotData.getCarosel().autoIntakeCycle();
                         robotData.getCarosel().checkForAutoEject();
 
-                        if (gamepad1.squareWasPressed() && !robotData.getCarosel().isEmptySpot()){
+                        //Auto cycling Not Active When the intake is on
+                        if (robotData.getCarosel().isIntakeMotorOn()){
+                            robotData.getCarosel().autoIntakeCycle(); //TODO only issue with this is that robot doens't sort when not active
+                        }
+                        else{
                             robotData.getCarosel().cycleCaroselManual();
                         }
                     }
@@ -144,14 +144,11 @@ public class DriverControlBlue extends OpMode {
                     //Cycling (Don't want cycling during submodes)
                     if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
                         if (gamepad1.touchpad){
-//                            RobotConstantsV2.updateCaroselPos((int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-//                            telemetry.addData("Increment:", (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier));
-//                            telemetry.addData("Position 1: ", RobotConstantsV2.caroselPos[0]);
                             RobotConstantsV2.CAROSEL_TOUCHPAD = (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier);
                             robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
                         }
 
-                        if (gamepad1.squareWasPressed()){
+                        else if (gamepad1.squareWasPressed()){
                             robotData.getCarosel().cycleCaroselManual();
                         }
                     }
@@ -169,14 +166,12 @@ public class DriverControlBlue extends OpMode {
                         robotData.getTurret().deactivateHumanIntakeMode();
                     }
 
-                    //robotData.getCarosel().updateInventory();
                     if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
-
-                        robotData.getCarosel().autoIntakeCycle();
-                        //robotData.getCarosel().checkForAutoEject();
-
-                        if (gamepad1.squareWasPressed() && !robotData.getCarosel().isEmptySpot()){
+                        if (gamepad1.squareWasPressed() && !robotData.getTurret().isToggleTurretAim()){
                             robotData.getCarosel().cycleCaroselManual();
+                        }
+                        else{
+                            robotData.getCarosel().autoIntakeCycle();
                         }
                     }
                     robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0, limelight);
@@ -187,7 +182,7 @@ public class DriverControlBlue extends OpMode {
                     break;
             }
 
-        robotData.getCarosel().receiveAutoCycleStatus(); //TODO might be able to put here to make sure the call is always beign retreived
+        robotData.getCarosel().receiveAutoCycleStatus();
 
         //-----------------------------------------------------
 
@@ -210,45 +205,13 @@ public class DriverControlBlue extends OpMode {
 
         /** Road Runner */
 
-        //!rrData.getNotAutoPosStored()
-
-        if (gamepad1.leftBumperWasPressed() && gamepad2.left_trigger > 0.5){
-
+        //Auto Align
+        if (gamepad1.leftBumperWasPressed() && gamepad2.left_trigger > 0.5) {
         }
 
-        else if (gamepad1.right_trigger > 0.1){
-
-            if (gamepad1.right_trigger < 0.5){
-                rrData.requestPark(limelight.getAlliance());
-            }
-
-            else if (gamepad1.left_bumper && gamepad1.right_trigger >= 0.5){
-                rrData.driveToPark(limelight.getAlliance());
-            }
-
-
-//            telemetry.addLine("poop");
-//            parkTemp = rrData.getParkingTrajectory(limelight.getAlliance());
-//            rrData.addTeleOpAction(parkTemp);
+        //Auto Park
+        else if (gamepad1.leftBumperWasPressed() && gamepad1.right_trigger > 0.5){
         }
-
-//        telemetry.addData("Teleop:",rrData.getTele)
-//        /** Auto Align */
-////!rrData.getNotAutoPosStored()
-//        //Deadman's switch
-//        if (gamepad1.leftBumperWasPressed() && gamepad1.left_trigger > 0.5 && limelight.getResults().isValid()){ //TODO can switch getting current pos using limelight
-//            rrData.killTeleOpActions(); //rrData.getDrive().getLocalizerPinpoint().getPose(),
-//            rrData.addTeleOpAction(rrData.getAlignTrajectory(limelight.getFidYaw()));
-//            rrData.runTeleOpActions();
-//        }
-//
-//        else if (gamepad1.dpadDownWasPressed()){
-//            rrData.killTeleOpActions();
-//            rrData.addTeleOpAction(rrData.getParkingTrajectory(limelight.getAlliance())); //TODO test this
-//        }
-//
-        rrData.updateTeleOpActions();
-
 
         /** Sub Modes */
 
@@ -269,18 +232,13 @@ public class DriverControlBlue extends OpMode {
             robotData.getCarosel().transferStartTimer();
         }
 
-        if (limelight.getResults().isValid()){
-            telemetry.addData("Current Pos: ", limelight.getCurrentPosLimelight());
-            telemetry.addData("Current Yaw: ", limelight.getYaw());
-        }
-
         //-----------------------------------------------------
 
         /** Sub Modes Requested */
 
         switch(robotData.getDriveTrain().getCurrentSubMode()){
             //Rapid Fire
-            case ("rapidFire"): //TODO Not aligned with array in constants
+            case ("rapidFire"):
 
                 if (robotData.getCarosel().getRapidFireCurrentShotCount() >= RobotConstantsV2.RAPID_FIRE_MAX_SHOTS) {
                     robotData.getDriveTrain().endSubMode();
@@ -294,7 +252,6 @@ public class DriverControlBlue extends OpMode {
                             robotData.getCarosel().cycleRapidFire();
 
                             if (robotData.getCarosel().isCaroselInPlace()){
-                                robotData.getCarosel().resetTransferStat();
                                 robotData.getCarosel().resetShotSuccess();
                                 robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
                                 robotData.getCarosel().activateTransferInProg();
@@ -304,13 +261,8 @@ public class DriverControlBlue extends OpMode {
                         break;
 
                     case ("transfer"):
-// || !robotData.getCarosel().detectedArtifact()
 
-                        robotData.getCarosel().startTransferCooldown();
-                        robotData.getCarosel().cycleTransferStartTimer();
-                        robotData.getCarosel().checkShotSuccess();
-
-                        if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
+                        if (!robotData.getCarosel().detectedArtifact() || robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
                             robotData.getCarosel().endFailsafeSubmode();
                             robotData.getCarosel().incrementRapidFireCurrentShotCount();
                             robotData.getCarosel().activateCycleInProg();
@@ -318,8 +270,9 @@ public class DriverControlBlue extends OpMode {
                             break;
                         }
 
-                        telemetry.addData("Shot Success", robotData.getCarosel().isShotSuccess());
-                        telemetry.addData("Shot Success Instant", robotData.getCarosel().getShotSuccessInstant());
+                        robotData.getCarosel().subModeTransferStartTimer(); //Simplified
+
+                        robotData.getCarosel().checkShotSuccess();
 
                         break;
 
@@ -345,7 +298,6 @@ public class DriverControlBlue extends OpMode {
                             robotData.getCarosel().cycleSortedFire(robotData.getCarosel().getSortedFireCurrentShotCount());
 
                             if (robotData.getCarosel().isCaroselInPlace()){
-                                robotData.getCarosel().resetTransferStat();
                                 robotData.getCarosel().resetShotSuccess();
                                 robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
                                 robotData.getCarosel().activateTransferInProg();
@@ -357,11 +309,6 @@ public class DriverControlBlue extends OpMode {
 
                     case ("transfer"):
 
-                        //|| !robotData.getCarosel().detectedArtifact()
-                        robotData.getCarosel().startTransferCooldown();
-                        robotData.getCarosel().cycleTransferStartTimer();
-                        robotData.getCarosel().checkShotSuccess();
-
                         if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
                             robotData.getCarosel().endFailsafeSubmode();
                             robotData.getCarosel().incrementSortedFireCurrentShotCount();
@@ -370,8 +317,9 @@ public class DriverControlBlue extends OpMode {
                             break;
                         }
 
-                        telemetry.addData("Shot Success", robotData.getCarosel().isShotSuccess());
-                        telemetry.addData("Shot Success Instant", robotData.getCarosel().getShotSuccessInstant());
+                        robotData.getCarosel().subModeTransferStartTimer();
+
+                        robotData.getCarosel().checkShotSuccess();
 
                         break;
 
@@ -385,7 +333,6 @@ public class DriverControlBlue extends OpMode {
             default:
                 robotData.getCarosel().resetRapidFireCurrentShotCount();
                 robotData.getCarosel().resetSortedFireCurrentShotCount();
-
                 break;
 
         }
@@ -395,20 +342,24 @@ public class DriverControlBlue extends OpMode {
         /** Emergency Abort */
         if (gamepad1.dpadDownWasPressed()){
             robotData.getDriveTrain().endSubMode();
-            //robotData.getCarosel().resetCarosel();
             RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
-            RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
         }
 
         //-----------------------------------------------------
 
         /** Last Calls */
-        if (!(LimeLightVision.isFoundMotif)){
-            LimeLightVision.failsafeMotif();
-            limelight.updateMotifCode();        //Very smart ngl
+
+        if (limelight.canSeeSomeAT()){
+            telemetry.addData("Current Pos: ", limelight.getCurrentPosLimelight());
+            telemetry.addData("Current Yaw: ", limelight.getYaw());
         }
 
-        robotData.getCarosel().updatePattern(LimeLightVision.motifCode); //TODO continueous updating not completely nessessary
+        if (!(LimeLightVision.isFoundMotif)){
+            LimeLightVision.failsafeMotif();
+            limelight.updateMotifCode();
+        }
+
+        robotData.getCarosel().updatePattern(LimeLightVision.motifCode);
         robotData.getDriveTrain().updateModeColor();
         robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
         robotData.getDriveTrain().omniDrive();
@@ -422,14 +373,13 @@ public class DriverControlBlue extends OpMode {
         robotData.getDriveTrain().checkEndgame();
 
         /** AprilTag Seen */
-        if (limelight.getResults().isValid()){
+        if (limelight.canSeeSomeAT()){
             telemetry.addLine("Eyes Open");
         }
         else{
             telemetry.addLine("Eyes Closed");
         }
 
-        //telemetry.addLine(String.format("Positions (%f , %f , %f)", RobotConstantsV2.caroselPos[0], RobotConstantsV2.caroselPos[2], RobotConstantsV2.caroselPos[2]));
         telemetry.update();
     }
 

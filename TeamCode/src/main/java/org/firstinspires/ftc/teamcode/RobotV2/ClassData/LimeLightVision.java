@@ -32,7 +32,7 @@ public class LimeLightVision {
 
     /** Hardware */
     private Limelight3A limelight;
-    private PinpointLocalizer localizer;
+    private PinpointLocalizer localizer; //TODO this localizer needs to be updated more often
 
     /** Variables */
     private double atHeight; //Meters
@@ -106,31 +106,19 @@ public class LimeLightVision {
 
     //----------------------------------------
 
-    /** Limelight */
-
-    public Pose2d getCurrentPosLimelight(){
-
-        if (getResults().isValid() && getResults() != null){
-            return new Pose2d(0,0,0); //TODO emergency
-        }
-
-        //TODO upload field to file
-        return new Pose2d(getResults().getBotpose().getPosition().x,getResults().getBotpose().getPosition().y, localizer.getHeadingLocalizerDegrees());
-
-    }
-
+    /** Limelight Object */
     public void setLimelightLocalizier(PinpointLocalizer localizer){
         activatedLocalizer = true;
         this.localizer = localizer;
     }
-
     public void initLimeLight(){
         limelight.start();
     }
-
     public void killLimeLight(){
         limelight.close();
     }
+
+    /** April Tags */
     public LLResult getResults(){
         return limelight.getLatestResult();
     }
@@ -140,28 +128,6 @@ public class LimeLightVision {
     public double getTy(){ //TODO Might cause error if see two april tags (could blacklist oblisk after it sees it or just check id)
         return getResults().getTy();
     }
-
-    /** IMU Pinpoint */
-
-    public double getYaw(){ //TODO might not be the same as april tag library pipline
-        return localizer.getHeadingLocalizerDegrees();
-    }
-
-    public double getFidYaw(){
-        if (getResults().isValid()){
-            List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
-
-            for (LLResultTypes.FiducialResult f : fiducials) {
-                if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
-                    return f.getTargetXDegreesNoCrosshair();
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    /** Data */
     private double getTyDeg(){
         return getTy() * (Math.PI/180);
     }
@@ -180,12 +146,39 @@ public class LimeLightVision {
 
         return 0;
     }
+    public Pose2d getCurrentPosLimelight(){
+        if (getResults().isValid() && getResults() != null){
+            return new Pose2d(0,0,0); //TODO emergency
+        }
 
+        //TODO upload field to file
+        return new Pose2d(getResults().getBotpose().getPosition().x,getResults().getBotpose().getPosition().y, localizer.getHeadingLocalizerDegrees());
+
+    }
+    public double getYaw(){ //TODO might not be the same as april tag library pipline
+        return localizer.getHeadingLocalizerDegrees();
+    }
+    public double getFidYaw(){
+        if (getResults().isValid()){
+            List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
+
+            for (LLResultTypes.FiducialResult f : fiducials) {
+                if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
+                    return f.getTargetXDegreesNoCrosshair();
+                }
+            }
+        }
+
+        return 0;
+    }
     public double getDisp(){
         if (getResults().isValid() && getResults() != null){
             return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
+    }
+    public boolean canSeeSomeAT(){
+        return getResults().isValid() && getResults() != null;
     }
 
     /** Last Updates */
@@ -224,14 +217,12 @@ public class LimeLightVision {
             }
         }
     }
-
     public static void failsafeMotif(){
         motifCode = new String[]{"Green","Purple","Purple"};
     }
-
-//    public String[] getMotifCode(){
-//        return motifCode;
-//    }
+    public String[] getMotifCode(){
+        return motifCode;
+    }
     public boolean foundMotif(){
         return isFoundMotif;
     }
