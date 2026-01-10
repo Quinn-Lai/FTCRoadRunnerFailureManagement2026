@@ -26,14 +26,9 @@ public class TestCaroselErrors extends LinearOpMode {
 
             else if (gamepad1.triangle){
                 telemetry.addLine("POOP");
-                robotData.getCarosel().getCaroselMotor().setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             }
 
-            telemetry.addData("Carosel Target Position: ", robotData.getCarosel().getCaroselMotor().getTargetPosition());
-            telemetry.addData("Carosel Current Position: ", robotData.getCarosel().getCaroselMotor().getCurrentPosition());
-            telemetry.addData("Error: ", robotData.getCarosel().getCaroselMotor().getTargetPosition() - robotData.getCarosel().getCaroselMotor().getCurrentPosition());
             telemetry.addData("Carosel In Place Status: ", robotData.getCarosel().isCaroselInPlace());
-            telemetry.addData("Motor Tolorence: ", RobotConstantsV2.MOTOR_TOLERENCE);
 
             telemetry.update();
         }

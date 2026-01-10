@@ -1,6 +1,8 @@
 package com.example.meepmeep;
 
+import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.Vector2d;
@@ -12,15 +14,36 @@ public class MeepMeepTest {
     public static void main(String[] args) {
         MeepMeep meepMeep = new MeepMeep(700);
 
-        Pose2d spawn = new Pose2d(-52, 48.5, Math.toRadians(305.954));
-        Pose2d shootingPos = new Pose2d(-15, 15, Math.toRadians(135));
+        //ReD
+//        //Pose2d spawn = new Pose2d(-52, 48.5, Math.toRadians(305.954));
+//        Pose2d spawn = new Pose2d(-49.5, 50, Math.toRadians(215.954));
+//        Pose2d shootingPos = new Pose2d(-15, 15, Math.toRadians(135));
+//        Pose2d lineBot = new Pose2d(33, 28, Math.toRadians(90));
+//        Pose2d lineBotCollect = new Pose2d(33, 45, Math.toRadians(90));
+//        Pose2d lineMid = new Pose2d(11, 28, Math.toRadians(90));
+//        Pose2d lineMidCollect = new Pose2d(11, 45, Math.toRadians(90));
+//        Pose2d lineTop = new Pose2d(-12, 28, Math.toRadians(90));
+//        Pose2d lineTopCollect = new Pose2d(-12, 45, Math.toRadians(90));
+//        Pose2d collectFromGateClose = new Pose2d(0,0,0);
+//        Pose2d collectFromGateFar = new Pose2d(0,0,0);
+//        Pose2d gate = new Pose2d(11, 48, Math.toRadians(90));
 
-        Pose2d lineBot = new Pose2d(34, 28, Math.toRadians(90));
-        Pose2d lineBotCollect = new Pose2d(34, 52, Math.toRadians(90));
-        Pose2d lineMid = new Pose2d(11, 28, Math.toRadians(90));
-        Pose2d lineMidCollect = new Pose2d(11, 52, Math.toRadians(90));
-        Pose2d lineTop = new Pose2d(-12, 28, Math.toRadians(90));
-        Pose2d lineTopCollect = new Pose2d(-12, 49, Math.toRadians(90));
+        //Blue
+
+        Pose2d spawn = new Pose2d(-49.5, -50, Math.toRadians(144.046));
+        Pose2d shootingPos = new Pose2d(-15, -15, Math.toRadians(225));
+
+        Pose2d lineBot = new Pose2d(33, -28, Math.toRadians(270));
+        Pose2d lineBotCollect = new Pose2d(33, -45, Math.toRadians(270));
+        Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
+        Pose2d lineMidCollect = new Pose2d(11, -45, Math.toRadians(270));
+        Pose2d lineTop = new Pose2d(-12, -28, Math.toRadians(270));
+        Pose2d lineTopCollect = new Pose2d(-12, -45, Math.toRadians(270));
+
+        Pose2d collectFromGateClose = new Pose2d(0,0,0);
+        Pose2d collectFromGateFar = new Pose2d(0,0,0);
+        Pose2d gate = new Pose2d(11, -48, Math.toRadians(270));
+
 
         RoadRunnerBotEntity myBot = new DefaultBotBuilder(meepMeep)
                 // Set bot constraints: maxVel, maxAccel, maxAngVel, maxAngAccel, track width
@@ -28,41 +51,55 @@ public class MeepMeepTest {
                 .setDimensions(16.945,17.87)
                 .build();
 
+        Action closeSideRed = myBot.getDrive().actionBuilder(spawn)
+                .setTangent(Math.toRadians(315))
+                .splineToLinearHeading(shootingPos,Math.toRadians(315))
 
-        myBot.runAction(myBot.getDrive().actionBuilder(spawn)
+                .setTangent(Math.toRadians(45))
+                .splineToLinearHeading(lineTop, Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(330))
-                        .splineToLinearHeading(shootingPos,Math.toRadians(330))
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(lineTopCollect,Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(45))
-                        .splineToLinearHeading(lineTop, Math.toRadians(90))
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(shootingPos,Math.toRadians(270))
 
-                        .setTangent(Math.toRadians(90))
-                        .splineToLinearHeading(lineTopCollect,Math.toRadians(90))
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(lineMid, Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(270))
-                        .splineToLinearHeading(shootingPos,Math.toRadians(270))
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(gate,Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(0))
-                        .splineToLinearHeading(lineMid, Math.toRadians(90))
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
 
-                        .setTangent(Math.toRadians(90))
-                        .splineToLinearHeading(lineMidCollect,Math.toRadians(90))
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(lineBot, Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(225))
-                        .splineToLinearHeading(shootingPos,Math.toRadians(270))
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(lineBotCollect,Math.toRadians(90))
 
-                        .setTangent(Math.toRadians(0))
-                        .splineToLinearHeading(lineBot, Math.toRadians(90))
+                .setTangent(Math.toRadians(225))
+                .splineToLinearHeading(shootingPos,Math.toRadians(225))
 
-                        .setTangent(Math.toRadians(90))
-                        .splineToLinearHeading(lineBotCollect,Math.toRadians(90))
+                .build();
 
-                        .setTangent(Math.toRadians(225))
-                        .splineToLinearHeading(shootingPos,Math.toRadians(225))
+        Action closeSideBlue = myBot.getDrive().actionBuilder(spawn)
 
+                .setTangent(Math.toRadians(45))
+                .splineToLinearHeading(shootingPos,Math.toRadians(45),new TranslationalVelConstraint(100))
+                .setTangent(Math.toRadians(315))
+                .splineToLinearHeading(lineTop, Math.toRadians(270))
 
-                        .build());
+                .build();
+
+        Action park = myBot.getDrive().actionBuilder(spawn)
+                //.splineToLinearHeading(gateBlue,0)
+
+                .turn(1)
+                .build();
+
+        myBot.runAction(closeSideBlue);
 
         meepMeep.setBackground(MeepMeep.Background.FIELD_DECODE_OFFICIAL)
                 .setDarkMode(true)
@@ -70,6 +107,7 @@ public class MeepMeepTest {
                 .addEntity(myBot)
                 .start();
     }
+
 }
 
 //.setTangent(Math.toRadians(180))
@@ -115,4 +153,4 @@ public class MeepMeepTest {
 //                .setTangent(Math.toRadians(90))
 //                .splineToLinearHeading(lineTopCollect, Math.toRadians(90),  new TranslationalVelConstraint(10))
 //                .setTangent(Math.toRadians(350))
-//                .splineToLinearHeading(shootingPos,Math.toRadians(340))
+//                .splineToLinearHeading(shootingPos,Math.toRadians(340)

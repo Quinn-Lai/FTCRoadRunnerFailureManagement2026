@@ -14,6 +14,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.robot.Robot;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -266,6 +267,235 @@ public class RobotDataV2 {
         public void endSubMode(){
             currentSubMode = RobotConstantsV2.subModes[2];
         }
+        public void executeSubMode(){
+            switch(getCurrentSubMode()){
+                //Rapid Fire
+                case ("rapidFire"):
+
+                    if (getCarosel().getRapidFireCurrentShotCount() >= RobotConstantsV2.RAPID_FIRE_MAX_SHOTS && !getCarosel().isTransferCooldownActive()) {
+                        getCarosel().cycleOrigin();
+                        endSubMode();
+                        break;
+                    }
+
+                    switch (getCarosel().getCurrentSubModeQueue()){
+                        case ("cycle"):
+
+                            if (!getCarosel().isTransferCooldownActive()){
+                                getCarosel().cycleRapidFire();
+
+                                if (getCarosel().isCaroselInPlace()){
+                                    //getCarosel().resetShotSuccess();
+                                    getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                                    getCarosel().activateTransferInProg();
+                                    getCarosel().startPreTransferCooldown();
+                                }
+                            }
+
+                            break;
+
+                        case ("transfer"):
+
+                            getCarosel().subModeTransferStartTimer();
+                            //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
+                            if (getCarosel().isFailsafeSubmode()){
+                                getCarosel().endFailsafeSubmode();
+                                getCarosel().incrementRapidFireCurrentShotCount();
+                                getCarosel().activateCycleInProg();
+                                getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                                break;
+                            }
+
+                            boolean status = true;
+
+                            if (getTurret().isFarToggled()) status = Math.abs(getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+                            else status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+
+                            //Only Shoot up to speed
+                            //getCarosel().checkShotSuccess();
+
+                            break;
+
+                        default:
+                            break;
+
+                    }
+
+                    break;
+
+                case ("sortedFire"):
+
+                    if (getCarosel().getSortedFireCurrentShotCount() >= getCarosel().getMaxShots() && !getCarosel().isTransferCooldownActive()) {
+                        getDriveTrain().endSubMode();
+                        getCarosel().cycleOrigin();
+                        break;
+                    }
+
+                    switch (getCarosel().getCurrentSubModeQueue()) {
+                        case ("cycle"):
+
+                            if (!getCarosel().isTransferCooldownActive()) {
+
+                                getCarosel().cycleSortedFire(getCarosel().getSortedFireCurrentShotCount());
+
+                                if (getCarosel().isCaroselInPlace()) {
+                                    //getCarosel().resetShotSuccess();
+                                    getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                                    getCarosel().activateTransferInProg();
+                                    getCarosel().startPreTransferCooldown();
+                                }
+                            }
+
+                            break;
+
+                        case ("transfer"):
+
+                            //!shotSucceed &&
+                            //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
+                            boolean status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+
+                            //Only Shoot up to speed
+                            getCarosel().subModeTransferStartTimer();
+
+                            if (getCarosel().isFailsafeSubmode()){
+                                getCarosel().endFailsafeSubmode();
+                                getCarosel().incrementSortedFireCurrentShotCount();
+                                getCarosel().activatePatternInProg();
+                                getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                                break;
+                            }
+
+                            //getCarosel().checkShotSuccess();
+
+                            break;
+
+                        default:
+                            break;
+                    }
+
+                    break;
+
+                default:
+                    getCarosel().resetRapidFireCurrentShotCount();
+                    getCarosel().resetSortedFireCurrentShotCount();
+                    break;
+
+            }
+        }
+        public boolean executePatternFireAuto(double distance){
+            getCarosel().updateCaroselEncoder();
+            getTurret().aimBall(distance);
+
+            if (getCarosel().getSortedFireCurrentShotCount() >= getCarosel().getMaxShots() && !getCarosel().isTransferCooldownActive()) {
+                getCarosel().transferReceiveTimer();
+                getCarosel().resetSortedFireCurrentShotCount();
+                getDriveTrain().endSubMode();
+                getCarosel().cycleOrigin();
+                return false;
+            }
+
+            switch (getCarosel().getCurrentSubModeQueue()) {
+                case ("cycle"):
+
+                    if (!getCarosel().isTransferCooldownActive()) {
+
+                        getCarosel().cycleSortedFire(getCarosel().getSortedFireCurrentShotCount());
+
+                        if (getCarosel().isCaroselInPlace()) {
+                            //getCarosel().resetShotSuccess();
+                            getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                            getCarosel().activateTransferInProg();
+                            getCarosel().startPreTransferCooldown();
+                        }
+                    }
+
+                    break;
+
+                case ("transfer"):
+
+                    //!shotSucceed &&
+                    //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
+                    boolean status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+
+                    //Only Shoot up to speed
+                    getCarosel().subModeTransferStartTimer();
+
+                    if (getCarosel().isFailsafeSubmode()){
+                        getCarosel().endFailsafeSubmode();
+                        getCarosel().incrementSortedFireCurrentShotCount();
+                        getCarosel().activatePatternInProg();
+                        getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                        break;
+                    }
+
+                    //getCarosel().checkShotSuccess();
+
+                    break;
+
+                default:
+                    break;
+            }
+
+            return true;
+        }
+        public boolean executeRapidFireAuto(double distance){
+            getCarosel().updateCaroselEncoder();
+            getTurret().aimBall(distance);
+
+            if (getCarosel().getRapidFireCurrentShotCount() >= RobotConstantsV2.RAPID_FIRE_MAX_SHOTS && !getCarosel().isTransferCooldownActive()) {
+                getCarosel().transferReceiveTimer();
+                getCarosel().resetRapidFireCurrentShotCount();
+                getDriveTrain().endSubMode();
+                getCarosel().cycleOrigin();
+                return false;
+            }
+
+            switch (getCarosel().getCurrentSubModeQueue()){
+                case ("cycle"):
+
+                    if (!getCarosel().isTransferCooldownActive()){
+                        getCarosel().cycleRapidFire();
+
+                        if (getCarosel().isCaroselInPlace()){
+                            //getCarosel().resetShotSuccess();
+                            getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                            getCarosel().activateTransferInProg();
+                            getCarosel().startPreTransferCooldown();
+                        }
+                    }
+
+                    break;
+
+                case ("transfer"):
+
+                    getCarosel().subModeTransferStartTimer();
+                    //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
+                    if (getCarosel().isFailsafeSubmode()){
+                        getCarosel().endFailsafeSubmode();
+                        getCarosel().incrementRapidFireCurrentShotCount();
+                        getCarosel().activateCycleInProg();
+                        getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                        break;
+                    }
+
+                    boolean status = true;
+
+                    if (getTurret().isFarToggled()) status = Math.abs(getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+                    else status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+
+                    //Only Shoot up to speed
+                    //getCarosel().checkShotSuccess();
+
+                    break;
+
+                default:
+                    break;
+
+            }
+
+            return true;
+        }
+
 
         /** Movement */
         public void powerMotorSafe(DcMotor motor, double targetPower){
@@ -391,12 +621,12 @@ public class RobotDataV2 {
         public void checkEndgame(){
             double currentRuntime = getRuntime();
 
-            if (currentRuntime >= 90 && currentRuntime <= 92){
+            if (currentRuntime >= RobotConstantsV2.ENDGAME_MARKER && currentRuntime <= RobotConstantsV2.ENDGAME_MARKER + 2){
                 driver.rumble(2);
                 telemetry.addLine("END GAME!");
             }
 
-            else if (currentRuntime >= 110 && currentRuntime <= 120){
+            else if (currentRuntime >= RobotConstantsV2.FINAL_ENDGAME_MARKER && currentRuntime <= RobotConstantsV2.FINAL_ENDGAME_MARKER + 2){
                 driver.rumble(2);
                 double time = 120 - currentRuntime;
                 telemetry.addLine("END GAME!");
@@ -404,10 +634,18 @@ public class RobotDataV2 {
             }
         }
         public void telemetryDriveTrain(){
+
+            telemetry.addLine("------------------------------------\n");
+
+            telemetry.addLine("Drive Train: ");
+
             telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
             telemetry.addData("Current Mode: ", currentMode);
             telemetry.addData("Current Sub Mode: ", currentSubMode);
-        } //TODO clean this up
+
+            telemetry.addLine("\n------------------------------------\n");
+
+        }
     }
 
     //----------------------------------------
@@ -415,18 +653,18 @@ public class RobotDataV2 {
     public class PIDControl{
 
         /** PID For Shooter*/
-        private double kP = 0.006;
-        private double kI = 0.0000000001;
-        private double kD = 0.00000012;
-        private double kF = 0.0004;
+        private double kP = 0.007;
+        private double kI = 0.0000015;
+        private double kD = 0.000003;
+        private double kF = 0.00045;
         private ElapsedTime PIDTimer = new ElapsedTime();
         private double integralSum = 0;
         private double lastError = 0;
 
         /** PID for Carosel */
-        private double kPC = 0.005;
-        private double kIC = 0;
-        private double kDC = 0;
+//        private double kPC = 0.0019;
+//        private double kIC = 0.000021; //0.000005
+//        private double kDC = 0.013; //0.13
         private ElapsedTime PIDTimerC = new ElapsedTime();
         private double integralSumC = 0;
         private double lastErrorC = 0;
@@ -435,7 +673,7 @@ public class RobotDataV2 {
 
         /** Get Constants for Shooter */
         public String getPIDCos(){
-            return String.format("kP: %f, kI: %f, kD: %f, kF: %f", kP, kI, kD, kF);
+            return String.format("kP: %f, kI: %f, kD: %f, kF: %f", RobotConstantsV2.kPC, RobotConstantsV2.kIC, RobotConstantsV2.kDC, kF);
         }
 
         /** PID */
@@ -476,8 +714,27 @@ public class RobotDataV2 {
 
             PIDTimerC.reset();
 
-            outputC = (errorC * kPC) + (derivateC * kDC) + (integralSumC * kIC);
+            double positionalCalc = errorC * RobotConstantsV2.kPC;
+            double integralCalc = integralSumC * RobotConstantsV2.kIC;
+            double derivativeCalc = derivateC * RobotConstantsV2.kDC;
 
+            if (positionalCalc > 0.3) positionalCalc = 0.3;
+            else if (positionalCalc < -0.3) positionalCalc = -0.3;
+
+            if (integralCalc > 0.1) integralCalc = 0.1;
+            else if (integralCalc < -0.1) integralCalc = -0.1;
+
+            if (derivativeCalc > 0.15) derivativeCalc = 0.15;
+            else if (derivativeCalc < -0.15) derivativeCalc = -0.15;
+
+            outputC = (positionalCalc) + (derivativeCalc) + (integralCalc);
+
+//            telemetry.addLine(getPIDCos());
+//            telemetry.addData("Output P: ", positionalCalc);
+//            telemetry.addData("Output I: ", integralCalc);
+//            telemetry.addData("Output D: ", derivativeCalc);
+//
+//            telemetry.addData("Output: ", outputC);
             return outputC;
         }
     }
@@ -493,7 +750,7 @@ public class RobotDataV2 {
         /** Physics Parameters */
         private final double a = -9.8;
         public double heightOfLauncher = 0.3556; //TODO Update this
-        private final double height = 1.2 - heightOfLauncher;
+        private final double height = RobotConstantsV2.HEIGHT_TO_AIM - heightOfLauncher;
         private final double vY = Math.sqrt(2 * -a * height);
         private double vX = 0;
         private double vX0 = 0; //initial vX of the robot at an instant in time
@@ -599,6 +856,7 @@ public class RobotDataV2 {
 
         /** Human Player Intake Mode */
         public void activateHumanIntakeMode(){
+            shooterServo.setPosition(RobotConstantsV2.MIN_HOOD_ANGLE_POS);
             shooterMotor.setDirection(DcMotorEx.Direction.FORWARD);
             powerShooterMotor(RobotConstantsV2.HUMAN_INTAKE_SPEED);
         }
@@ -611,8 +869,8 @@ public class RobotDataV2 {
             double current = shooterMotor.getVelocity();
             //shooterMotor.setVelocity(PIDShooter(current,TPS));
             shooterMotor.setPower(PIDShooter(current,TPS));
-            telemetry.addData("TPS NOW", TPS);
-            telemetry.addData("TPS Current: ", current);
+            //telemetry.addData("TPS NOW", TPS);
+            //telemetry.addData("TPS Current: ", current);
 
         }
         public void killShooter(){
@@ -623,16 +881,15 @@ public class RobotDataV2 {
         /** Hood */
         private double convertDegToServo(double angle){
 
+            //telemetry.addData("Angle: ", angle);
             if (angle > RobotConstantsV2.MAX_HOOD_ANGLE) return RobotConstantsV2.MAX_HOOD_ANGLE_POS;
             else if (angle < RobotConstantsV2.MIN_HOOD_ANGLE) return RobotConstantsV2.MIN_HOOD_ANGLE_POS;
 
-            return (double) Math.round((-0.0388889 * angle + 2.72778) * 1000) / 1000;
+            return (double) Math.round((0.033358 * angle - 1.41127) * 1000) / 1000;
         }
         public void angleRobot(double disp){
             double desiredAngle = getAngleTotal(disp) + RobotConstantsV2.ANGLE_BONUS;
             shooterServo.setPosition(convertDegToServo(desiredAngle));
-            telemetry.addData("a",convertDegToServo(desiredAngle));
-            telemetry.addData("x",desiredAngle);
         }
 
         /** Final Shot */
@@ -648,40 +905,55 @@ public class RobotDataV2 {
 
         /** Final Updates */
         public void telemetryTurret(double disp){
-            telemetry.addLine("Kinematics: \n");
+//            telemetry.addLine("Kinematics: \n");
+//
+//            telemetry.addData("Total Velocity: ", getVelocityTotal(disp));
+//            telemetry.addData("vY: ", getVy());
+//            telemetry.addData("vX: ",getVx(disp));
+//            telemetry.addData("vX0: ", getInitalVelocityX());
+//            telemetry.addData("Estimated Drag Multiplier: ", RobotConstantsV2.dragMultiplier);
+//            telemetry.addLine("-------------------------- \n");
+//
+//            telemetry.addLine("TPS: \n");
+//
+//            telemetry.addData("True TPS: ", shooterMotor.getVelocity());
+//            telemetry.addData("Ticks Per Second: ", getTPS(disp));
+//            telemetry.addData("TPS Error:", getTPSError(disp));
+//
+//            telemetry.addLine("-------------------------- \n");
+//
+//            telemetry.addLine("Outputs: \n");
+//
+//            telemetry.addData("Time Extrema:", getTimeExtrema());
+//            telemetry.addData("Displacement (m): ", disp);
+//            telemetry.addData("Angle: " , getAngleTotal(disp));
+//            telemetry.addData("True Servo Angle:",convertDegToServo(getAngleTotal(disp)));
+            telemetry.addLine("------------------------------------\n");
 
-            telemetry.addData("Total Velocity: ", getVelocityTotal(disp));
-            telemetry.addData("vY: ", getVy());
-            telemetry.addData("vX: ",getVx(disp));
-            telemetry.addData("vX0: ", getInitalVelocityX());
-            telemetry.addData("Estimated Drag Multiplier: ", RobotConstantsV2.dragMultiplier);
-            telemetry.addLine("-------------------------- \n");
+            telemetry.addLine("Turret: ");
 
-            telemetry.addLine("TPS: \n");
-
-            telemetry.addData("True TPS: ", shooterMotor.getVelocity());
-            telemetry.addData("Ticks Per Second: ", getTPS(disp));
+            telemetry.addData("Current Shooter Motor TPS: ", shooterMotor.getVelocity());
+            telemetry.addData("Desired TPS: ", getTPS(disp));
             telemetry.addData("TPS Error:", getTPSError(disp));
-
-            telemetry.addLine("-------------------------- \n");
-
-            telemetry.addLine("Outputs: \n");
-
-            telemetry.addData("Time Extrema:", getTimeExtrema());
             telemetry.addData("Displacement (m): ", disp);
-            telemetry.addData("Angle: " , getAngleTotal(disp));
-            telemetry.addData("True Servo Angle:",convertDegToServo(getAngleTotal(disp)));
+            telemetry.addData("Angle: ", getAngleTotal(disp));
+
+            telemetry.addLine("\n------------------------------------\n");
 
         }
         public void telemetryTurretBasic(){
             telemetry.addData("Turret On: ", toggleTurretAim);
-            telemetry.addData("Close Shot: ", !isFar);
+            telemetry.addData("Far Shot: ", !isFar);
         }
         public double getTPSError(double disp){
             return shooterMotor.getVelocity() - getTPS(disp);
         }
         public double getTPSErrorManual(double TPS){
             return shooterMotor.getVelocity() - TPS;
+        }
+        public boolean isUpToSpeed(double distance){
+            //Current error less than allowed error
+            return Math.abs(getTPSError(distance)) < getTurret().getTPS(distance) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
         }
     }
 
@@ -693,6 +965,7 @@ public class RobotDataV2 {
         private DcMotorEx intakeMotor;
         private Servo transferServo;
         private CRServo caroselServo;
+        private Servo caroselServoPos; //TODO temp
         private AnalogInput caroselAnalog;
 
 
@@ -703,7 +976,7 @@ public class RobotDataV2 {
         private ColorSensor colorSensorBack;
         private DistanceSensor colorSensorFrontDist;
         private DistanceSensor colorSensorBackDist;
-        private AnalogInput rangerSensor; //TODO might have to use binary if possible
+        private AnalogInput rangerSensor;
         private DigitalChannel transferBeam;
 
 
@@ -723,6 +996,8 @@ public class RobotDataV2 {
         private boolean transferUp;
         private ElapsedTime transferCooldown;
         private boolean transferCooldownActive;
+        private ElapsedTime pretransferCooldown;
+        private boolean pretransferCooldownActive;
 
         /** Submode */
         private boolean cycleInProg;
@@ -748,6 +1023,7 @@ public class RobotDataV2 {
             /** Hardware Init */
 
             caroselServo = hardwareMap.get(CRServo.class,"caroselServo");
+            caroselServoPos = hardwareMap.get(Servo.class,"caroselServoL"); //TODO temp
             caroselAnalog = hardwareMap.get(AnalogInput.class,"analogCarosel");
             transferServo = hardwareMap.get(Servo.class,"transferServo");
 
@@ -788,8 +1064,10 @@ public class RobotDataV2 {
             shotSucceed = false;
             failsafeSubmode = false;
             ejectActive = false;
+            pretransferCooldownActive = false;
 
             /** Timers */
+            pretransferCooldown = new ElapsedTime();
             failsafeTimer = new ElapsedTime();
             transferCooldown = new ElapsedTime();
             autoIntakeCoolDown = new ElapsedTime();
@@ -818,6 +1096,16 @@ public class RobotDataV2 {
 
 
         /** Intake */
+        public void forceReverseIntakeOn(){
+            intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
+            intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
+            intakeMotorOn = true;
+        }
+        public void forceReverseIntakeOff(){
+            intakeMotor.setDirection(DcMotorEx.Direction.FORWARD);
+            intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
+            intakeMotorOn = true;
+        }
         public void switchIntake(){
             intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             if (!intakeMotorOn){
@@ -841,10 +1129,12 @@ public class RobotDataV2 {
             }
         }
         public void forceIntakeOn(){
+            intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             intakeMotor.setVelocity(RobotConstantsV2.INTAKE_ON);
             intakeMotorOn = true;
         }
         public void forceIntakeOff(){
+            intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             intakeMotor.setPower(RobotConstantsV2.INTAKE_OFF);
             intakeMotorOn = false;
         }
@@ -854,6 +1144,7 @@ public class RobotDataV2 {
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_IN_EJECT);
                 intakeMotorOn = true;
                 ejectActive = true;
+                cycleOrigin();
             }
 
             else if (isEmptySpot()){
@@ -878,7 +1169,7 @@ public class RobotDataV2 {
             }
         }
         public void forceTransferUp(){
-            //inventory[currentCycle] = "Empty";
+            inventory[currentCycle] = "Empty";
             transferServo.setPosition(RobotConstantsV2.TRANSFER_UP);
             transferUp = true;
         }
@@ -888,7 +1179,7 @@ public class RobotDataV2 {
             transferCooldownActive = false;
         }
         public void transferStartTimer(){
-            if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2])){
+            if (turret.isToggleTurretAim() && !driveTrain.getCurrentMode().equals(RobotConstantsV2.mainModes[2]) && isCaroselInPlace()){
                 transferCooldownActive = true;
                 forceTransferUp();
                 transferCooldown.reset();
@@ -904,16 +1195,20 @@ public class RobotDataV2 {
             transferInProg = true;
         }
         public void subModeTransferStartTimer(){
-            if (transferInProg){ //
+            if (transferInProg && isCaroselInPlace() && pretransferCooldown.milliseconds() > RobotConstantsV2.COOLDOWN_PRE_SHOT){ //
                 transferInProg = false;
                 transferCooldownActive = true;
                 forceTransferUp();
                 transferCooldown.reset();
                 startFailsafeSubmode();
+                pretransferCooldownActive = false;
             }
         }
         public boolean isTransferCooldownActive(){
             return transferCooldownActive;
+        }
+        public void startPreTransferCooldown(){
+            pretransferCooldown.reset();
         }
 
 
@@ -945,7 +1240,8 @@ public class RobotDataV2 {
             failsafeTimer.reset();
         }
         public boolean isFailsafeSubmode(){
-            if (!shotSucceed && failsafeSubmode && failsafeTimer.milliseconds() > RobotConstantsV2.FAILSAFE_SUBMODE_TIMER){
+            //!shotSucceed &&
+            if (failsafeSubmode && failsafeTimer.milliseconds() > RobotConstantsV2.FAILSAFE_SUBMODE_TIMER){
                 failsafeSubmode = false;
                 return true;
             }
@@ -957,7 +1253,7 @@ public class RobotDataV2 {
         public void checkShotSuccess(){
             if (isShotSuccess()){
                 shotSucceed = true;
-                inventory[currentCycle] = "Empty";
+                //inventory[currentCycle] = "Empty";
             }
         }
         public void resetShotSuccess(){
@@ -1053,14 +1349,16 @@ public class RobotDataV2 {
                 return;
             }
 
-            if (detectedArtifactBack()){
-                inventory[currentCycle] = getColorBack();
+            if (detectedArtifactFront()){
+                inventory[currentCycle] = getColorFront();
                 return;
             }
 
-            if (detectedArtifactFront()) inventory[currentCycle] = getColorFront();
+            if (detectedArtifactBack()){
+                inventory[currentCycle] = getColorBack();
+            }
         }
-        private void wipeInventory(){
+        public void wipeInventory(){
             inventory = new String[]{"Empty","Empty","Empty"};
         }
         public int getEmptySpot(){
@@ -1107,6 +1405,7 @@ public class RobotDataV2 {
         }
         public void autoIntakeCycle(){
             //telemetry.addData("Next Empty Spot: ", getEmptySpot());
+            updateCaroselEncoder();
             if (!autoIntakeCooldownActive && !transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
                 updateInventory();
                 autoIntakeCooldownActive = true;
@@ -1119,14 +1418,31 @@ public class RobotDataV2 {
         public void receiveAutoCycleStatus(){
             if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.AUTO_CYCLE_COOLDOWN){
                 autoIntakeCooldownActive = false;
+
+                if (inventory[currentCycle].equals("Empty") && detectedArtifact()) inventory[currentCycle] = "Purple"; //Failsafe
+
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
         }
-        public void cycleCarosel(int desiredCycle){
+        public void cycleOrigin(){
+            cycleCarosel(0);
+        }
+//        public void cycleCarosel(int desiredCycle){
+//            if (!transferCooldownActive){
+//                int increm = getCycleIncrement(desiredCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD;
+//                currentCycle = desiredCycle;
+//
+//                telemetry.addData("Run to Pos: ", increm);
+//
+//                runCaroselToPos(increm);
+//            }
+//        }
+
+        public void cycleCarosel(int desiredCycle){ //TODO Temp
             if (!transferCooldownActive){
-                int increm = getCycleIncrement(desiredCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD;
+                double increm = RobotConstantsV2.caroselPositions[desiredCycle] + RobotConstantsV2.CAROSEL_TOUCHPAD / 100.0;
                 currentCycle = desiredCycle;
-                runCaroselToPos(increm);
+                caroselServoPos.setPosition(increm);
             }
         }
         public void cyclePattern(int number){
@@ -1147,10 +1463,18 @@ public class RobotDataV2 {
         public double getCaroselDegrees(){
             return caroselAnalog.getVoltage() * RobotConstantsV2.encoderRes;
         }
-        public boolean isBusy(){
-            double targetPos = getCycleIncrement(currentCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD; //TODO test this
-            return Math.abs(targetPos - getCaroselDegrees()) > RobotConstantsV2.CAROSEL_TOLERANCE;
+
+//        public boolean isBusy(){
+//            double targetPos = getCycleIncrement(currentCycle) + RobotConstantsV2.CAROSEL_TOUCHPAD; //TODO test this
+//            return Math.abs(targetPos - getCaroselDegrees()) < RobotConstantsV2.CAROSEL_TOLERANCE;
+//        }
+//
+        public boolean isBusy(){ //TODO Temp
+            double targetPos = -318.91011 * (RobotConstantsV2.caroselPositions[currentCycle] + RobotConstantsV2.CAROSEL_TOUCHPAD/100.0) + 337.27894;
+            return Math.abs(targetPos - globalCaroselPosition) > RobotConstantsV2.CAROSEL_TOLERANCE;
         }
+
+
         public boolean isCaroselInPlace(){
             return !isBusy();
         }
@@ -1161,7 +1485,7 @@ public class RobotDataV2 {
 
             double step = 0;
 
-            double N = 3.3;
+            double N = 360;
 
             double diffe = diff - current;
 
@@ -1174,14 +1498,21 @@ public class RobotDataV2 {
                 step = (modDiff);
             }
 
-            return step * RobotConstantsV2.encoderRes;
+            return step;
         } //this is used for tracking global encoder pos
-        public void updateCaroselEncoder(){
-            double current = getCaroselDegrees();
-            double in = getCaroselIncrement(current,lastCaroselPosition);
-            lastCaroselPosition = current;
-            globalCaroselPosition += in;
+
+//        public void updateCaroselEncoder(){
+//            double current = getCaroselDegrees();
+//            double in = getCaroselIncrement(current,lastCaroselPosition);
+//            lastCaroselPosition = current;
+//            globalCaroselPosition += in;
+//            telemetry.addData("globalCaroselPos: ", globalCaroselPosition);
+//        }
+
+        public void updateCaroselEncoder(){ //TODO Temp
+            globalCaroselPosition = caroselAnalog.getVoltage() * RobotConstantsV2.encoderRes;
         }
+
         public void resetCaroselGlobalIncrement(){
             //TODO Find a way to zero it
             RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
@@ -1197,10 +1528,10 @@ public class RobotDataV2 {
             int modDiff = ((diff % N) + N) % N;
 
             if (modDiff > N/ 2){
-                step = (modDiff - N) * RobotConstantsV2.CAROSEL_INCREMENT;
+                step = (modDiff - N) * 120;
             }
             else{
-                step = (modDiff) * RobotConstantsV2.CAROSEL_INCREMENT;
+                step = (modDiff) * 120;
             }
 
             RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT += step;
@@ -1281,16 +1612,29 @@ public class RobotDataV2 {
             return (rangerSensor.getVoltage() * RobotConstantsV2.RANGER_EQU_SLOPE + RobotConstantsV2.RANGER_EQU_Y_INT) * RobotConstantsV2.IN_TO_CM;
         }
         public boolean detectedArtifact(){
-            return (getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_MIN_THRESHOLD && getRangerDistance() < RobotConstantsV2.RANGER_DETECTION_MAX_THRESHOLD) || !inventory[currentCycle].equals("Empty");
+
+            if (!isCaroselInPlace()) return false;
+
+            return (getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_MIN_THRESHOLD && getRangerDistance() < RobotConstantsV2.RANGER_DETECTION_MAX_THRESHOLD);
         }
+
+        public boolean isShotConfirmed(){
+
+            if (!isCaroselInPlace()) return false;
+
+            return getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_CONFIRM_SHOT;
+        }
+
+
         public String getColorBack() { //TODO here issue with megging
-            if (detectedArtifact()) {
+            if (detectedArtifactBack()) {
                 float[] HSV = getHSVBack();
 
-                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S && HSV[2] >= RobotConstantsV2.MIDDLE_V){
                     return "Green";
                 }
-                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIDDLE_S){
+
+                else{
                     return "Purple";
                 }
             }
@@ -1299,19 +1643,20 @@ public class RobotDataV2 {
         }
 
         public boolean detectedArtifactFront(){
-            return colorSensorFrontDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD;
+            return colorSensorFrontDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD_FRONT && isCaroselInPlace();
         }
         public boolean detectedArtifactBack(){
-            return colorSensorBackDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD;
+            return colorSensorBackDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD_BACK && isCaroselInPlace();
         }
         public String getColorFront(){
             if (detectedArtifactFront()) {
                 float[] HSV = getHSVFront();
 
-                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S && HSV[2] >= RobotConstantsV2.MIDDLE_V){
                     return "Green";
                 }
-                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIDDLE_S){
+
+                else{
                     return "Purple";
                 }
             }
@@ -1334,11 +1679,10 @@ public class RobotDataV2 {
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
                     }
 
-                    telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
-                    telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
-                    telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
-
-                    if (!limelight.getResults().isValid() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
+//                    if (!limelight.canSeeSomeAT() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
+//                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+//                    }
+                    if (!limelight.canSeeSomeAT() || !turret.isToggleTurretAim() || !getTurret().isUpToSpeed(disp)){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
                     else{
@@ -1369,17 +1713,15 @@ public class RobotDataV2 {
 
                 case("manual"):
 
-                    //TODO keep these separate in case the calcs start to diverge
                     if (turret.isFarToggled()){
-                        telemetry.addData("Distance: ", disp);
-                        telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
-                        telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
-                        telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
+//                        telemetry.addData("Distance: ", disp);
+//                        telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
+//                        telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
+//                        telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
 
-                        if (Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
+                        if (!getTurret().isUpToSpeed(disp)){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
-
                         else{
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
                         }
@@ -1387,7 +1729,7 @@ public class RobotDataV2 {
                     else{
                         disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
 
-                        if (Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
+                        if (!getTurret().isUpToSpeed(disp)){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
                         else{
@@ -1434,18 +1776,37 @@ public class RobotDataV2 {
 
         /** Final Updates */
         public void telemetryCarosel(){
+
+            telemetry.addLine("------------------------------------\n");
+
+            telemetry.addLine("Carosel \n");
+
+
+            telemetry.addData("Detected ART: ", detectedArtifact());
+            telemetry.addData("Ranger Dist: ", getRangerDistance());
+            //telemetry.addData("Analog Ranger:", rangerSensor.getVoltage());
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
             telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern[0], pattern[1], pattern[2]));
             float[] HSVFront = getHSVFront();
             telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
-
             float[] HSVBack = getHSVBack();
             telemetry.addLine(String.format("HSV Back: (%.5f, %.5f, %.5f)", HSVBack[0], HSVBack[1], HSVBack[2]));
 
             telemetry.addData("Current Cycle: ", currentCycle);
-            telemetry.addData("Identified Color: ", getColorBack());
-            telemetry.addData("Inventory Current: ", inventory[currentCycle]);
+            telemetry.addData("Distance Front: ", colorSensorFrontDist.getDistance(DistanceUnit.CM));
+            telemetry.addData("Color Front: ", getColorFront());
+            telemetry.addData("Distance Back: ", colorSensorBackDist.getDistance(DistanceUnit.CM));
+            telemetry.addData("Color Back: ", getColorBack());
+            telemetry.addData("IN Place: ", isCaroselInPlace());
+//            telemetry.addData("Detected Back: ", detectedArtifactBack());
+////            telemetry.addData("Detected Front: ", detectedArtifactFront());
+//
+//            telemetry.addData("Global Position: ", globalCaroselPosition);
+//            telemetry.addData("Inventory Current: ", inventory[currentCycle]);
             telemetry.addData("Has Pattern in Inventory: ", hasPattern());
+//            telemetry.addData("Voltage: ", caroselAnalog.getVoltage());
+
+            telemetry.addLine("\n------------------------------------\n");
         }
     }
 }

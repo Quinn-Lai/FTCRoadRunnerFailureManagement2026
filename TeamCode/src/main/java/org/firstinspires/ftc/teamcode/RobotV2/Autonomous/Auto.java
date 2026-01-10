@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.RobotV2.Autonomous;
 
+import com.acmerobotics.roadrunner.InstantAction;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
@@ -14,21 +15,31 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RoadRunnerDataV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
+import java.util.ArrayList;
+
 
 @Autonomous
 public class Auto extends OpMode {
 
     //Data Classes
     private LimeLightVision limeLight;
-    private RobotDataV2 robotData;       //Basic Robot Mechanics
-    private RoadRunnerDataV2 rrData;  //Road Runner Implementation
+    private RoadRunnerDataV2 rrData;
+
+    private final boolean patternEnabled = true;
+    private final boolean isWaitTurret = false; //false
 
     @Override
     public void init(){
 
-        robotData = new RobotDataV2(hardwareMap, telemetry);       //Basic Robot Mechanics
-        rrData = new RoadRunnerDataV2(robotData);  //Road Runner Implementation
+        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
+        RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO; //Transfer Shot
+        RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
+
+        rrData = new RoadRunnerDataV2(new RobotDataV2(hardwareMap, telemetry));
         limeLight = new LimeLightVision(hardwareMap,telemetry,"blue");
+
+        rrData.createDashboard();
+
         limeLight.updateAtHeight(rrData.getRobotData().getTurret().getHeightOfLauncher());
         limeLight.initLimeLight();
 
@@ -39,6 +50,8 @@ public class Auto extends OpMode {
         rrData.getRobotData().getCarosel().forceTransferDown();
         rrData.getRobotData().getCarosel().setInventoryAuto();
         rrData.getRobotData().getCarosel().indicatorsInInit();
+        rrData.getRobotData().getCarosel().cycleOrigin();
+        rrData.getRobotData().getCarosel().updateCaroselEncoder();
     }
 
     @Override
@@ -46,10 +59,16 @@ public class Auto extends OpMode {
 
         //Color Selection & OpenCV
 
-        //rrData.updateRobotData(robotData);
-
         limeLight.updateOrientationIMU();
         limeLight.updateMotifCode();
+
+        if (gamepad1.crossWasPressed()){
+            limeLight.switchAlliance();
+        }
+
+        if (gamepad1.circleWasPressed()){
+            rrData.switchOpenGateActive();
+        }
 
         if (rrData.getRobotData().isPendingSide()){
             telemetry.addLine("Select a Starting Side (Far or Close)!");
@@ -59,12 +78,13 @@ public class Auto extends OpMode {
             if (gamepad1.dpad_up){
                 rrData.getRobotData().setStartFar(false);
                 rrData.getRobotData().selectedSide();
+                rrData.setDisplacement(RobotConstantsV2.CLOSE_BALL_DISTANCE);
             }
-
             //Far Side
             else if (gamepad1.dpad_down){
                 rrData.getRobotData().setStartFar(true);
                 rrData.getRobotData().selectedSide();
+                rrData.setDisplacement(RobotConstantsV2.FAR_BALL_DISTANCE);
             }
 
         }
@@ -97,24 +117,29 @@ public class Auto extends OpMode {
                 if (rrData.getRobotData().isStartedLeft()){
 
                     Pose2d lineBot = new Pose2d(33, -28, Math.toRadians(270));
-                    Pose2d lineBotCollect = new Pose2d(33, -42, Math.toRadians(270));
+                    Pose2d lineBotCollect = new Pose2d(33, -RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(270));
                     Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
-                    Pose2d lineMidCollect = new Pose2d(11, -42, Math.toRadians(270));
+                    Pose2d lineMidCollect = new Pose2d(11, -RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(270));
                     Pose2d lineTop = new Pose2d(-12, -28, Math.toRadians(270));
-                    Pose2d lineTopCollect = new Pose2d(-12, -42, Math.toRadians(270));
+                    Pose2d lineTopCollect = new Pose2d(-12, -RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(270));
+
+                    Pose2d collectFromGateClose = new Pose2d(0,0,0);
+                    Pose2d collectFromGateFar = new Pose2d(0,0,0);
+                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_BLUE;
 
                     //Far Side
                     if (rrData.getRobotData().isStartFar()){
-                        rrData.setBeginPose(new Pose2d(61.065, -13, Math.toRadians(180)));
+
+                        rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_FAR_BLUE);
+
+                        rrData.setBeginPose(new Pose2d(61.065, -13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_BLUE)));
                         rrData.createDrive();
 
                         //Common Positions
                         Pose2d spawn = rrData.getBeginPose();
-                        Pose2d shootingPos = new Pose2d(51, -13, Math.toRadians(202));
+                        Pose2d shootingPos = new Pose2d(51, -13, Math.toRadians(200));
 
                         //Each Route
-
-                        //Possibly just move this to rrData Class
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(180))
@@ -132,17 +157,37 @@ public class Auto extends OpMode {
                                 .setTangent(Math.toRadians(90))
                                 .splineToLinearHeading(shootingPos,Math.toRadians(20), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
-                        TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                                .setTangent(Math.toRadians(200))
-                                .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        TrajectoryActionBuilder middleLinePrep;
+                        TrajectoryActionBuilder middleLineCollect;
+                        TrajectoryActionBuilder shootThird;
 
-                        TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
-                                .setTangent(Math.toRadians(270))
-                                .splineToLinearHeading(lineMidCollect, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                        if (rrData.isOpenGateActive()){
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(180))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
-                        TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
-                                .setTangent(Math.toRadians(45))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(20),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(gate, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(gate)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(0),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        }
+
+                        else{
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(200))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(lineMidCollect, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                                    .setTangent(Math.toRadians(45))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(20),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        }
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(200))
@@ -167,13 +212,16 @@ public class Auto extends OpMode {
                                 shootThird,
                                 topLinePrep,
                                 topLineCollect,
-                                shootFourth
+                                shootFourth,
                         });
                     }
 
                     //Close Side
                     else{
-                        rrData.setBeginPose(new Pose2d(-52, -48.5, Math.toRadians(54.046)));
+                        rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE);
+
+                        //new Pose2d(-52, -48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE))
+                        rrData.setBeginPose(new Pose2d(-49.5, -50, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE)));
                         rrData.createDrive();
 
                         //Common Positions
@@ -182,9 +230,10 @@ public class Auto extends OpMode {
 
                         //Each Route
 
+                        //30
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
-                                .setTangent(Math.toRadians(30))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                                .setTangent(Math.toRadians(45))
+                                .splineToLinearHeading(shootingPos,Math.toRadians(45),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(315))
@@ -200,22 +249,41 @@ public class Auto extends OpMode {
                                 .setTangent(Math.toRadians(90))
                                 .splineToLinearHeading(shootingPos,Math.toRadians(90));
 
-                        TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                                .setTangent(Math.toRadians(0))
-                                .splineToLinearHeading(lineMid, Math.toRadians(270));
+                        TrajectoryActionBuilder middleLinePrep;
+                        TrajectoryActionBuilder middleLineCollect;
+                        TrajectoryActionBuilder shootThird;
 
-                        TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
-                                .setTangent(Math.toRadians(270))
-                                .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                        if (rrData.isOpenGateActive()){
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(0))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(270));
 
-                        TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
-                                .setTangent(Math.toRadians(135))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(90));
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(gate,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(gate)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(180));
+                        }
+
+                        else{
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(0))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(270));
+
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                                    .setTangent(Math.toRadians(135))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(90));
+                        }
 
                         TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(0))
                                 .splineToLinearHeading(lineBot, Math.toRadians(270));
-
 
                         TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().actionBuilder(lineBot)
                                 .setTangent(Math.toRadians(270))
@@ -244,14 +312,20 @@ public class Auto extends OpMode {
                 //Trajectory Right
                 else{
                     Pose2d lineBot = new Pose2d(33, 28, Math.toRadians(90));
-                    Pose2d lineBotCollect = new Pose2d(33, 42, Math.toRadians(90));
+                    Pose2d lineBotCollect = new Pose2d(33, RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(90));
                     Pose2d lineMid = new Pose2d(11, 28, Math.toRadians(90));
-                    Pose2d lineMidCollect = new Pose2d(11, 42, Math.toRadians(90));
+                    Pose2d lineMidCollect = new Pose2d(11, RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(90));
                     Pose2d lineTop = new Pose2d(-12, 28, Math.toRadians(90));
-                    Pose2d lineTopCollect = new Pose2d(-12, 42, Math.toRadians(90));
+                    Pose2d lineTopCollect = new Pose2d(-12, RobotConstantsV2.INTAKE_TRAVEL, Math.toRadians(90));
+
+                    Pose2d collectFromGateClose = new Pose2d(0,0,0);
+                    Pose2d collectFromGateFar = new Pose2d(0,0,0);
+                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_RED;
 
                     if (rrData.getRobotData().isStartFar()){
-                        rrData.setBeginPose( new Pose2d(61.065, 13, Math.toRadians(180)));
+                        rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_FAR_RED);
+
+                        rrData.setBeginPose( new Pose2d(61.065, 13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_RED)));
                         rrData.createDrive();
 
                         //Common Positions
@@ -259,8 +333,6 @@ public class Auto extends OpMode {
                         Pose2d shootingPos = new Pose2d(51, 13, Math.toRadians(160));
 
                         //Each Route
-
-                        //Possibly just move this to rrData Class
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                                 .setTangent(Math.toRadians(180))
@@ -278,17 +350,36 @@ public class Auto extends OpMode {
                                 .setTangent(Math.toRadians(270))
                                 .splineToLinearHeading(shootingPos,Math.toRadians(340),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
-                        TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                                .setTangent(Math.toRadians(150))
-                                .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        TrajectoryActionBuilder middleLinePrep;
+                        TrajectoryActionBuilder middleLineCollect;
+                        TrajectoryActionBuilder shootThird;
 
-                        TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
-                                .setTangent(Math.toRadians(90))
-                                .splineToLinearHeading(lineMidCollect, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                        if (rrData.isOpenGateActive()){
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(180))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
-                        TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
-                                .setTangent(Math.toRadians(315))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(315),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(gate, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(gate)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(0),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        }
+                        else{
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(150))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(180),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(lineMidCollect, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                                    .setTangent(Math.toRadians(315))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(315),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                        }
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(150))
@@ -320,7 +411,10 @@ public class Auto extends OpMode {
 
                         //Close Side
 
-                        rrData.setBeginPose(new Pose2d(-52, 48.5, Math.toRadians(305.954)));
+                        rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_CLOSE_RED);
+
+                        //new Pose2d(-52, 48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_RED))
+                        rrData.setBeginPose(new Pose2d(-49.5, 50, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_RED)));
                         rrData.createDrive();
 
                         //Common Positions
@@ -330,8 +424,8 @@ public class Auto extends OpMode {
                         //Each Route
 
                         TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
-                                .setTangent(Math.toRadians(330))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                                .setTangent(Math.toRadians(315)) //330
+                                .splineToLinearHeading(shootingPos,Math.toRadians(315), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
 
                         TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(45))
@@ -342,22 +436,41 @@ public class Auto extends OpMode {
                                 .setTangent(Math.toRadians(90))
                                 .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
 
-
                         TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(lineTopCollect)
                                 .setTangent(Math.toRadians(270))
                                 .splineToLinearHeading(shootingPos,Math.toRadians(270));
 
-                        TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                                .setTangent(Math.toRadians(0))
-                                .splineToLinearHeading(lineMid, Math.toRadians(90));
+                        TrajectoryActionBuilder middleLinePrep;
+                        TrajectoryActionBuilder middleLineCollect;
+                        TrajectoryActionBuilder shootThird;
 
-                        TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
-                                .setTangent(Math.toRadians(90))
-                                .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                        if (rrData.isOpenGateActive()){
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(0))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(90));
 
-                        TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
-                                .setTangent(Math.toRadians(225))
-                                .splineToLinearHeading(shootingPos,Math.toRadians(270));
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                                    .setTangent(Math.toRadians(270))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(180));
+                        }
+
+                        else{
+                            middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                                    .setTangent(Math.toRadians(0))
+                                    .splineToLinearHeading(lineMid, Math.toRadians(90));
+
+                            middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                                    .setTangent(Math.toRadians(90))
+                                    .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+
+                            shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                                    .setTangent(Math.toRadians(225))
+                                    .splineToLinearHeading(shootingPos,Math.toRadians(270));
+                        }
 
                         TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                                 .setTangent(Math.toRadians(0))
@@ -396,23 +509,27 @@ public class Auto extends OpMode {
             }
 
             telemetry.addLine("Completed Initialization..... \n --------------------------" );
+
             telemetry.addData("Found Motif", limeLight.foundMotif());
             if (LimeLightVision.isFoundMotif){
                 rrData.getRobotData().getCarosel().updatePattern(LimeLightVision.motifCode);
-                rrData.setCloseSidFoundAT(true);
-                telemetry.addData("Robot Data: ", rrData.getRobotData().getCarosel().getInventory()[0] + ", " + rrData.getRobotData().getCarosel().getInventory()[1] + ", " + rrData.getRobotData().getCarosel().getInventory()[2]);
-                telemetry.addData("Motif Code: ", LimeLightVision.motifCode[0] + ", " + LimeLightVision.motifCode[1] + ", " + LimeLightVision.motifCode[2]);
+                telemetry.addData("Motif: ", LimeLightVision.motifCode[0] + ", " + LimeLightVision.motifCode[1] + ", " + LimeLightVision.motifCode[2]);
             }
-            telemetry.addData("Pinpoint Yaw: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
-            telemetry.addData("Pinpoint Heading (diff): ", rrData.getDrive().getLocalizerPinpoint().getPose().heading);
-            telemetry.addData("Pinpoint x: ", rrData.getDrive().getLocalizerPinpoint().getPose().position.x);
+
+//            telemetry.addData("Pinpoint Yaw: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
+//            telemetry.addData("Pinpoint Heading (diff): ", rrData.getDrive().getLocalizerPinpoint().getPose().heading);
+//            telemetry.addData("Pinpoint x: ", rrData.getDrive().getLocalizerPinpoint().getPose().position.x);
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", rrData.getRobotData().getCarosel().getInventory()[0], rrData.getRobotData().getCarosel().getInventory()[1], rrData.getRobotData().getCarosel().getInventory()[2]));
             telemetry.addData("Starting Side", rrData.getRobotData().getStartingSide());
             telemetry.addData("Starting Position", rrData.getRobotData().getStartingPosition());
+            telemetry.addData("Starting Color: ", limeLight.getAlliance());
+            telemetry.addData("Pin Point Heading: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
+            telemetry.addData("Pin Point Working: ", rrData.isPinpointHeadingCorrect(rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees()));
+            telemetry.addData("Attempt Gate Open: ", rrData.isOpenGateActive());
 
             telemetry.update();
-
         }
+
     }
 
     @Override
@@ -429,7 +546,6 @@ public class Auto extends OpMode {
         if (rrData.getRobotData().isStartFar()){
             telemetry.addLine("Beginning Auto: Far Side");
             telemetry.update();
-
             rrData.getRobotData().getTurret().toggleTurretFar(true);
 
         }
@@ -437,110 +553,148 @@ public class Auto extends OpMode {
         //Close Side Auto
         else{
             telemetry.addLine("Beginning Auto: Close Side");
-
-            rrData.getRobotData().getTurret().toggleTurretFar(false);
-
             telemetry.update();
+            rrData.getRobotData().getTurret().toggleTurretFar(false);
         }
 
-        //rrData.getRobotData().getCarosel().updatePattern(LimeLightVision.motifCode);
+        rrData.setLoopStatus(true);
+
+        SequentialAction collectFirstLine = new SequentialAction(
+                rrData.getTrajectory(2),
+                rrData.intakeOn(),
+                rrData.startFailsafeTimer(),
+                new ParallelAction(
+                        rrData.getTrajectory(3),
+                        rrData.checkAutoIntake()
+                ),
+                rrData.intakeReverse(),
+                rrData.cycleFirstPattern()
+        );
+
+        SequentialAction shootFirstLine = new SequentialAction(
+                rrData.getTrajectory(4),
+                rrData.intakeOff(),
+                rrData.waitForTurret(isWaitTurret),
+                rrData.requestArtifactShots(patternEnabled),
+                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.forceTransferDown()
+        );
+
+        SequentialAction collectSecondLine = new SequentialAction(
+                rrData.getTrajectory(5),
+                rrData.intakeOn(),
+                rrData.startFailsafeTimer(),
+                new ParallelAction(
+                        rrData.getTrajectory(6),
+                        rrData.checkAutoIntake()
+                ),
+                rrData.intakeReverse(),
+                rrData.cycleFirstPattern()
+        );
+
+        SequentialAction shootSecondLine = new SequentialAction(
+                rrData.getTrajectory(7),
+                rrData.intakeOff(),
+                rrData.waitForTurret(isWaitTurret),
+                rrData.requestArtifactShots(patternEnabled),
+                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.forceTransferDown()
+        );
+
+        SequentialAction collectThirdLine = new SequentialAction(
+                rrData.getTrajectory(8),
+                rrData.intakeOn(),
+                rrData.startFailsafeTimer(),
+                new ParallelAction(
+                        rrData.getTrajectory(9),
+                        rrData.checkAutoIntake()
+                ),
+                rrData.intakeReverse(),
+                rrData.cycleFirstPattern()
+        );
+
+        SequentialAction shootThirdLine = new SequentialAction(
+                rrData.getTrajectory(10),
+                rrData.intakeOff(),
+                rrData.waitForTurret(isWaitTurret),
+                rrData.requestArtifactShots(patternEnabled),
+                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.forceTransferDown(),
+                rrData.cycleFirstPattern()
+        );
+
+        SequentialAction collectCloseGate = new SequentialAction(
+
+        );
+
+        SequentialAction collectFarGate = new SequentialAction(
+
+        );
+
+        SequentialAction[] buildBear;
+
+        buildBear = new SequentialAction[]{
+                collectFirstLine,   //0
+                shootFirstLine,     //1
+                collectSecondLine,  //2
+                shootSecondLine,    //3
+                collectThirdLine,   //4
+                shootThirdLine,     //5
+        };
+
+        //For Gate
+        if (rrData.isOpenGateActive()){
+            buildBear = new SequentialAction[]{
+                    collectSecondLine,  //2
+                    shootSecondLine,    //3
+                    collectFirstLine,   //0
+                    shootFirstLine,     //1
+                    collectThirdLine,   //4
+                    shootThirdLine,     //5
+            };
+        }
 
         Actions.runBlocking(
-                new SequentialAction(
+                new ParallelAction(
 
-                        rrData.setIsDoneInit(false),
-                        new ParallelAction(
-                                rrData.turretPIDSetUp(),
-                                rrData.getTrajectory(1),
-                                rrData.indicatorsUpdate(limeLight),
-                                rrData.telemetryAuto(),
-                                rrData.locateAprilTag(limeLight)
-                        ),
+                        //Repeated Stuff
 
-                        rrData.setIsDoneInit(false),
-//                            new ParallelAction(
-//                                    rrData.indicatorsUpdate(limeLight),
-//                                    rrData.turretPIDOn(),
-//                                    rrData.telemetryAuto(),
-//                                    new SequentialAction(
-//                                            rrData.requestPatternFire(),
-//                                            rrData.patternFire()
-//                                    )
-//                            )
+                        //rrData.updateCaroselEncoder(),
+                        rrData.indicatorsUpdate(limeLight),
+                        //rrData.updateTelemetry(telemetry),
+                        rrData.turretPID(),
+                        rrData.locateAprilTag(limeLight),
+                        rrData.telemetryAuto(),
 
-                        new ParallelAction(
 
-                                //Shoot First
+                        new SequentialAction(
 
-                                rrData.indicatorsUpdate(limeLight),
-                                rrData.telemetryAuto(),
-                                rrData.turretPIDOn(),
-                                rrData.locateAprilTag(limeLight),
+                                //Speed Up Init
 
-                                new SequentialAction(
+                                new ParallelAction(
+                                        rrData.getTrajectory(1),
+                                        rrData.waitForTurret(isWaitTurret)
+                                ),
 
-                                        //First Ball
+                                //First Ball
 
-                                        rrData.requestPatternFire(),
-                                        rrData.patternFire(),
-                                        //rrData.setTurretDone(true),
-                                        rrData.forceTransferDown(),
+                                rrData.requestArtifactShots(patternEnabled),
+                                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                                rrData.forceTransferDown(),
 
-                                        //Collect Bottom Line
-                                        rrData.getTrajectory(2),
-                                        rrData.intakeOn(),
-                                        rrData.startFailsafeTimer(),
-                                        new ParallelAction(
-                                                rrData.getTrajectory(3),
-                                                rrData.checkAutoIntake()
-                                        ),
-                                        rrData.intakeOff(),
+                                buildBear[0],
+                                buildBear[1],
+                                buildBear[2],
+                                buildBear[3],
+                                buildBear[4],
+                                buildBear[5],
 
-                                        //Second Shot
-
-                                        rrData.getTrajectory(4),
-                                        rrData.requestPatternFire(),
-                                        rrData.patternFire(),
-                                        //rrData.setTurretDone(true),
-                                        rrData.forceTransferDown(),
-
-                                        //Collect Middle Line
-                                        rrData.getTrajectory(5),
-                                        rrData.intakeOn(),
-                                        rrData.startFailsafeTimer(),
-                                        new ParallelAction(
-                                                rrData.getTrajectory(6),
-                                                rrData.checkAutoIntake()
-                                        ),
-                                        rrData.intakeOff(),
-
-                                        //Third Shot
-
-                                        rrData.getTrajectory(7),
-                                        rrData.requestPatternFire(),
-                                        rrData.patternFire(),
-                                        //rrData.setTurretDone(true),
-                                        rrData.forceTransferDown(),
-
-                                        //Collect Top Line
-                                        rrData.getTrajectory(8),
-                                        rrData.intakeOn(),
-                                        rrData.startFailsafeTimer(),
-                                        new ParallelAction(
-                                                rrData.getTrajectory(9),
-                                                rrData.checkAutoIntake()
-                                        ),
-                                        rrData.intakeOff(),
-                                        rrData.setTurretDone(true),
-                                        rrData.setIsDoneInit(true)
-                                )
-                        ),
-
-                        rrData.killTurret()
+                                rrData.setLooping(false)
+                        )
                 )
         );
 
-
+    //TODO op mode stop after if abort
 
     }
 
@@ -552,27 +706,14 @@ public class Auto extends OpMode {
     @Override
     public void stop() {
 
+        rrData.setLooping(false);
+
         //RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().getLocalizerPinpoint().getPose(); //Get last pos
 
         telemetry.addLine("Autonomous Completed!");
         telemetry.addData("Time Spent: ", RobotDataV2.getRuntime());
+        telemetry.update();
+
         limeLight.killLimeLight();
     }
 }
-
-//                            rrData.cyclePattern(0),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer(),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer(),
-//                            new SleepAction(1),
-//                            rrData.cyclePattern(1),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer(),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer(),
-//                            rrData.cyclePattern(2),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer(),
-//                            new SleepAction(1),
-//                            rrData.switchTransfer()

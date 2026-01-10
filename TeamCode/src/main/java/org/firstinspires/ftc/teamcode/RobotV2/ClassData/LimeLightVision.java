@@ -159,12 +159,13 @@ public class LimeLightVision {
         return localizer.getHeadingLocalizerDegrees();
     }
     public double getFidYaw(){
-        if (getResults().isValid()){
+        if (canSeeSomeAT()){
             List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
 
             for (LLResultTypes.FiducialResult f : fiducials) {
                 if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
-                    return f.getTargetXDegreesNoCrosshair();
+                    return f.getTargetXDegreesNoCrosshair() + f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES);
+                    //f.getRobotPoseFieldSpace().getOrientation().getYaw()
                 }
             }
         }
@@ -173,7 +174,7 @@ public class LimeLightVision {
     }
     public double getDisp(){
         if (getResults().isValid() && getResults() != null){
-            return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
+            return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()+10))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
     }
@@ -183,9 +184,11 @@ public class LimeLightVision {
 
     /** Last Updates */
     public void telemetryLimeLight(){
-        if (getResults() != null && getResults().isValid()) {
+        if (canSeeSomeAT()) {
             telemetry.addData("tX", getTx());
             telemetry.addData("tY", getTy());
+            //telemetry.addData("Disp: ", getDisp());
+            telemetry.addData("Motif: ", motifCode);
         }
     }
     public void updateOrientationIMU(){
@@ -200,22 +203,34 @@ public class LimeLightVision {
 
         List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
 
+        double greatestArea = 0;
+        LLResultTypes.FiducialResult greatestAreaMotif = null;
+
         for (LLResultTypes.FiducialResult f : fiducials) {
-            if (f.getFiducialId() == 21){
-                isFoundMotif = true;
-                motifCode = new String[]{"Green","Purple","Purple"};
-            }
-
-            else if (f.getFiducialId() == 22){
-                isFoundMotif = true;
-                motifCode = new String[]{"Purple","Green","Purple"};
-            }
-
-            else if (f.getFiducialId() == 23){
-                isFoundMotif = true;
-                motifCode = new String[]{"Purple","Purple","Green"};
+            double area = f.getTargetArea();
+            if (area > greatestArea && (f.getFiducialId() == 21 || f.getFiducialId() == 22 || f.getFiducialId() == 23)){
+                greatestArea = area;
+                greatestAreaMotif = f;
             }
         }
+
+        if (greatestAreaMotif == null) return;
+
+        if (greatestAreaMotif.getFiducialId() == 21){
+            isFoundMotif = true;
+            motifCode = new String[]{"Green","Purple","Purple"};
+        }
+
+        else if (greatestAreaMotif.getFiducialId() == 22){
+            isFoundMotif = true;
+            motifCode = new String[]{"Purple","Green","Purple"};
+        }
+
+        else if (greatestAreaMotif.getFiducialId() == 23){
+            isFoundMotif = true;
+            motifCode = new String[]{"Purple","Purple","Green"};
+        }
+
     }
     public static void failsafeMotif(){
         motifCode = new String[]{"Green","Purple","Purple"};
@@ -230,6 +245,24 @@ public class LimeLightVision {
     /** Alliance */
     public String getAlliance(){
         return alliance;
+    }
+    public void updateAlliance(String alliance){
+        this.alliance = alliance;
+        if (this.alliance.equals("blue")) limelight.pipelineSwitch(0);
+        else limelight.pipelineSwitch(1);
+    }
+
+    public void switchAlliance(){
+        if (alliance.equals("blue")){
+            alliance = "red";
+            limelight.pipelineSwitch(1);
+
+        }
+
+        else{
+            alliance = "blue";
+            limelight.pipelineSwitch(0);
+        }
     }
 
 }
