@@ -38,9 +38,13 @@ public class RobotConstantsV2 {
     public static int COOLDOWN_SHOT = 200;
     public static int COOLDOWN_PRE_SHOT = 0;
 
-    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 100;
-    public static int COOLDOWN_SHOT_AUTO = 300;
-    public static int COOLDOWN_PRE_SHOT_AUTO = 100;
+    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 200;
+    public static int COOLDOWN_SHOT_AUTO = 200;
+    public static int COOLDOWN_PRE_SHOT_AUTO = 0;
+
+//    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 100;
+//    public static int COOLDOWN_SHOT_AUTO = 300;
+//    public static int COOLDOWN_PRE_SHOT_AUTO = 100;
 
     /** Intake */
     public static final int INTAKE_ON = 1500;
@@ -52,8 +56,8 @@ public class RobotConstantsV2 {
     public static final int RANGER_DETECTION_MIN_THRESHOLD = 5;
     public static final int RANGER_DETECTION_MAX_THRESHOLD = 15;
     public static final int RANGER_DETECTION_CONFIRM_SHOT = 16;
-    public static final int COLOR_SENSOR_DIST_THRESHOLD_FRONT = 2;
-    public static final int COLOR_SENSOR_DIST_THRESHOLD_BACK = 4;
+    public static final int COLOR_SENSOR_DIST_THRESHOLD_FRONT = 1;
+    public static final double COLOR_SENSOR_DIST_THRESHOLD_BACK = 4;
 
     public static double kPC = 0.0019;
     public static double kIC = 0.000021; //0.000005
@@ -89,32 +93,95 @@ public class RobotConstantsV2 {
 
 
     /** Auto */
-    public static final int AUTO_FAILSAFE_TIMER = 5000; //Pick up
-    public static int AUTO_SLOW_SPEED = 20;
-    public static final int AUTO_FAST_SPEED = 800;
+    public static final int AUTO_FAILSAFE_TIMER = 2500; //Pick up
+    public static int AUTO_SUPER_SLOW_SPEED = 15;
+    public static int AUTO_SLOW_SPEED = 100;
+    public static int AUTO_FAST_SPEED = 670;
     public static final int AUTO_SUPER_FAST_SPEED = 800;
-    public static final double PINPOINT_HEADING_CLOSE_BLUE = 144.046; //54.046
+    public static int AUTO_GATE_SPEED = 200;
+    public static final double PINPOINT_HEADING_CLOSE_BLUE = 54.046; //144.046
     public static final double PINPOINT_HEADING_FAR_BLUE = 180;
-    public static final double PINPOINT_HEADING_CLOSE_RED = 215.954; //305.954
+    public static final double PINPOINT_HEADING_CLOSE_RED = 305.954; //215.954
     public static final double PINPOINT_HEADING_FAR_RED = 180;
     public static final double PINPOINT_TOLERENCE = 0.01;
-    public static final Pose2d GATE_OPEN_POSITION_BLUE =  new Pose2d(11, -48, Math.toRadians(270));
-    public static final Pose2d GATE_OPEN_POSITION_RED =  new Pose2d(11, 48, Math.toRadians(90));
-    public static double INTAKE_TRAVEL = 45;
+    public static double ANGLE_TOLERENCE_AUTO = 2;
 
+    /** Auto StartPos*/
+    public static final Pose2d BLUE_SPAWN_FAR = new Pose2d(61.065+4, -13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_BLUE));
+    public static final Pose2d BLUE_SHOOT_FAR = new Pose2d(51+4, -13, Math.toRadians(203));
+    public static final Pose2d BLUE_SPAWN_CLOSE = new Pose2d(-52, -48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE));
+    public static final Pose2d BLUE_SHOOT_CLOSE = new Pose2d(-15, -15, Math.toRadians(227)); //225
+    public static final Pose2d OFF_LINE_BLUE_SHOOT_CLOSE = new Pose2d(-20, -15, Math.toRadians(230)); //225
+
+
+    public static final Pose2d RED_SPAWN_FAR = new Pose2d(61.065+4, 13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_RED));
+    public static final Pose2d RED_SHOOT_FAR = new Pose2d(51+4, 13, Math.toRadians(157));
+    public static final Pose2d RED_SPAWN_CLOSE = new Pose2d(-52, 48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_RED));
+    public static final Pose2d RED_SHOOT_CLOSE = new Pose2d(-15, 15, Math.toRadians(133)); //135
+    public static final Pose2d OFF_LINE_RED_SHOOT_CLOSE = new Pose2d(-20, 15, Math.toRadians(130)); //135
+
+
+
+    /** Auto Positional Increments*/
+
+    public static double ANGLE_GATE = 90;
+    public static double INTAKE_TRAVEL = 47;
+    public static double PREP_TRAVEL = 24;
+    public static double LINE_BOT_PREP_TRAVEL = 38;
+    public static double LINE_MID_PREP_TRAVEL = 15;
+    public static double LINE_TOP_PREP_TRAVEL = 9;
+    public static double BELOW_TOP_INCREMENT = 12; //8
+
+
+    /** Auto Blue Pos*/
+    public final static Pose2d LINE_BOT_PREP_BLUE = new Pose2d(RobotConstantsV2.LINE_BOT_PREP_TRAVEL, -RobotConstantsV2.PREP_TRAVEL, Math.toRadians(270));
+    public final static Pose2d LINE_BOT_COLLECT_BLUE = new Pose2d(RobotConstantsV2.LINE_BOT_PREP_TRAVEL, -RobotConstantsV2.INTAKE_TRAVEL - RobotConstantsV2.BELOW_TOP_INCREMENT, Math.toRadians(270));
+    public final static Pose2d LINE_MID_PREP_BLUE = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, -RobotConstantsV2.PREP_TRAVEL, Math.toRadians(270));
+    public final static Pose2d LINE_MID_COLLECT_BLUE = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, -RobotConstantsV2.INTAKE_TRAVEL - RobotConstantsV2.BELOW_TOP_INCREMENT, Math.toRadians(270));
+    public final static Pose2d LINE_TOP_PREP_BLUE = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, -RobotConstantsV2.PREP_TRAVEL, Math.toRadians(270));
+    public final static Pose2d LINE_TOP_COLLECT_BLUE = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, -RobotConstantsV2.INTAKE_TRAVEL-2, Math.toRadians(270));
+    public final static Pose2d GATE_LINE_MID_PREP_BLUE = new Pose2d(11, -RobotConstantsV2.PREP_TRAVEL, Math.toRadians(270));
+    public final static Pose2d GATE_OPEN_POSITION_BLUE =  new Pose2d(11, -52, Math.toRadians(270));
+    public final static Pose2d COLLECT_GATE_CLOSE_BLUE = new Pose2d(0,0,0);
+    public final static Pose2d COLLECT_GATE_FAR_BLUE = new Pose2d(0,0,0);
+    public final static Pose2d SLAM_GATE_BLUE = new Pose2d(1,-53,Math.toRadians(270));
+
+    /** Auto Red Pos*/
+    public final static Pose2d LINE_BOT_PREP_RED = new Pose2d(RobotConstantsV2.LINE_BOT_PREP_TRAVEL, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
+    public final static Pose2d LINE_BOT_COLLECT_RED = new Pose2d(RobotConstantsV2.LINE_BOT_PREP_TRAVEL, RobotConstantsV2.INTAKE_TRAVEL+ RobotConstantsV2.BELOW_TOP_INCREMENT, Math.toRadians(90));
+    public final static Pose2d LINE_MID_PREP_RED = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
+    public final static Pose2d LINE_MID_COLLECT_RED = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, RobotConstantsV2.INTAKE_TRAVEL + RobotConstantsV2.BELOW_TOP_INCREMENT, Math.toRadians(90));
+    public final static Pose2d LINE_TOP_PREP_RED = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
+    public final static Pose2d LINE_TOP_COLLECT_RED = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, RobotConstantsV2.INTAKE_TRAVEL+2, Math.toRadians(90));
+    public final static Pose2d GATE_LINE_MID_PREP_RED = new Pose2d(11, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
+    public final static Pose2d GATE_OPEN_POSITION_RED =  new Pose2d(11, 52, Math.toRadians(90));
+    public final static Pose2d COLLECT_GATE_CLOSE_RED = new Pose2d(0,0,0);
+    public final static Pose2d COLLECT_GATE_FAR_RED = new Pose2d(0,0,0);
+    public final static Pose2d SLAM_GATE_RED = new Pose2d(-1,53,Math.toRadians(90));
+
+    /** Auto Speed Control */
+
+    public static int MAX_ACCEL_SPEED = 150;
+    public static int MIN_ACCEL_SPEED = -30; //-30
+    public static int MAX_VEL_SPEED = 100;
+    public static int MAX_ACCEL_DEFAULT = 50;
+    public static int MIN_ACCEL_DEFAULT = -30;
+    public static int MAX_VEL_DEFAULT = 50;
 
     /** TeleOp Road Runner */
     public static final Pose2d blueCorner = new Pose2d(61.5275,61.065,Math.toRadians(270));
     public static final Pose2d redCorner= new Pose2d(61.5275,-61.065,Math.toRadians(90));
-    public static final Vector2d parkingBlue =  new Vector2d(36.7,32.5);
-    public static final Vector2d parkingRed =  new Vector2d(36.7,-32.5);
+    public static final Pose2d parkingBlue =  new Pose2d(36.7,32.5,Math.toRadians(270));
+    public static final Pose2d parkingRed =  new Pose2d(36.7,-32.5, Math.toRadians(90));
     public static final double TRIGGER_TOLERENCE = 0.3;
-    public static final double PARKING_TOLERENCE = 0.5;
+    public static final double PARKING_TOLERENCE = 1;
+    public static final double PARKING_SPEED = 50;
 
     /** HSV Values */
-    public static int MIDDLE_H = 170;
-    public static double MIDDLE_S = 0.5;
-    public static int MIDDLE_V = 1500;
+    public static int MIDDLE_H = 165; //170
+    public static double MIN_S = 0.44f;
+    public static double MIN_V = .18f;
+    public static int SENSOR_GAIN = 5;
 
     /** Misc */
 

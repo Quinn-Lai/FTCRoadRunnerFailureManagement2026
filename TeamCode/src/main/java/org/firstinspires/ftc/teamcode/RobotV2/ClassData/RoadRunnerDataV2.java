@@ -9,6 +9,7 @@ import com.acmerobotics.roadrunner.InstantAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -127,15 +128,15 @@ public class RoadRunnerDataV2{
 
         if (alliance.equals("blue")){
 
-            park = getDrive().correctionActionBuilder(RobotConstantsV2.blueCorner)
+            park = getDrive().actionBuilder(RobotConstantsV2.blueCorner)
                     .setTangent(Math.toRadians(225))
-                    .splineToConstantHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270))
+                    .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
                     .build();
         }
         else{
-            park = getDrive().correctionActionBuilder(RobotConstantsV2.redCorner)
+            park = getDrive().actionBuilder(RobotConstantsV2.redCorner)
                     .setTangent(Math.toRadians(135))
-                    .splineToConstantHeading(RobotConstantsV2.parkingRed,Math.toRadians(90))
+                    .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
                     .build();
         }
 
@@ -152,6 +153,25 @@ public class RoadRunnerDataV2{
         return align;
 
     }
+
+    public Action getAlignTrajectoryAuto(double limelightYaw){
+
+        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
+
+        Action align = getDrive().actionBuilder(getDrive().localizer.getPose())
+                .turn(Math.toRadians(-limelightYaw))
+                .build();
+
+        return align;
+
+    }
+
+//    public Action updateCurrentTrajectory(int num){
+//
+//
+//        getTrajectoryPath().set(num,);
+//    }
+
     public void setTeleOpActionActive(boolean active){
         this.teleOpActionActive = active;
     }
@@ -208,26 +228,6 @@ public class RoadRunnerDataV2{
 
         }
     }
-
-    public void driveToPark(String alliance){
-
-        if (alliance.equals("blue")){
-            drive.setDrivePowers(new PoseVelocity2d(RobotConstantsV2.parkingBlue, 0));
-        }
-        else{
-            drive.setDrivePowers(new PoseVelocity2d(RobotConstantsV2.parkingRed, 0));
-        }
-
-        drive.updatePoseEstimate();
-
-        Pose2d pose = drive.localizer.getPose();
-
-        TelemetryPacket packet = new TelemetryPacket();
-        packet.fieldOverlay().setStroke("#3F51B5");
-        Drawing.drawRobot(packet.fieldOverlay(), pose);
-        FtcDashboard.getInstance().sendTelemetryPacket(packet);
-
-    }
     public List<Action> getTeleOpActions(){
         return teleOpActions;
     }
@@ -274,6 +274,7 @@ public class RoadRunnerDataV2{
     }
 
     /** Trajectory Generation */
+
     public ArrayList<Action> getTrajectoryPath() {
         return trajectoryBuilt;
     }     //Build Trajectory Path Array List
@@ -373,11 +374,45 @@ public class RoadRunnerDataV2{
     public Action cycleFirstPattern(){
         return new InstantAction( () -> robotData.getCarosel().cyclePattern(0));
     }
+    public Action cycleFirstSlot(){
+        return new InstantAction(() -> robotData.getCarosel().cycleOrigin());
+    }
+    public Action cycleQuickSlot(boolean patternActive){
+        if (patternActive) return cycleFirstPattern();
+        else return cycleFirstSlot();
+    }
+
+    public Action forceFeedInventory(boolean active,String color1, String color2, String color3){
+        if (active) return new InstantAction(() -> robotData.getCarosel().forceFeedInventory(color1,color2,color3));
+        return new InstantAction(() -> doNothing());
+    }
+
+    public Action forceFeedCycle(boolean active){
+        if (active) return cycleFirstSlot();
+        return new InstantAction( () -> doNothing());
+    }
+
     public Action quickUpdateMotif(){
         return new InstantAction( () -> robotData.getCarosel().updatePattern(LimeLightVision.motifCode));
     }
 
     /** Complex Actions */
+
+    public class UpdateInventory implements Action{
+
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+
+            robotData.getCarosel().updateInventory();
+
+            return loopingActive;
+
+        }
+
+    }
+    public Action updateInveentory(){
+        return new UpdateInventory();
+    }
 
     public class UpdateCaroselEncdoer implements Action{
 
@@ -428,6 +463,77 @@ public class RoadRunnerDataV2{
     public Action requestPatternFire() {
         return new RequestPatternFire();
     }
+
+    public class PatternFireWaitSpeed implements Action {
+
+        public double disp;
+
+        public PatternFireWaitSpeed(double disp){
+            this.disp = disp;
+        }
+
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+            robotData.getCarosel().transferReceiveTimer();
+            return robotData.getDriveTrain().executePatternFireAutoFar(disp);
+//            if (robotData.getCarosel().getSortedFireCurrentShotCount() >= robotData.getCarosel().getMaxShots()) {
+//                robotData.getCarosel().transferReceiveTimer();
+//                robotData.getCarosel().resetSortedFireCurrentShotCount();
+//                robotData.getDriveTrain().endSubMode();
+//                return false;
+//            }
+//
+//            switch (robotData.getCarosel().getCurrentSubModeQueue()) {
+//                case ("cycle"):
+//
+//                    if (!robotData.getCarosel().isTransferCooldownActive()) {
+//
+//                        robotData.getCarosel().cycleSortedFire(robotData.getCarosel().getSortedFireCurrentShotCount());
+//
+//                        if (robotData.getCarosel().isCaroselInPlace()) {
+//                            robotData.getCarosel().resetShotSuccess();
+//                            robotData.getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+//                            robotData.getCarosel().activateTransferInProg();
+//                        }
+//                    }
+//
+//                    break;
+//
+//                case ("transfer"):
+//
+//                    if (robotData.getCarosel().getShotSuccessInstant() || robotData.getCarosel().isFailsafeSubmode()){
+//                        robotData.getCarosel().endFailsafeSubmode();
+//                        robotData.getCarosel().incrementSortedFireCurrentShotCount();
+//                        robotData.getCarosel().activatePatternInProg();
+//                        robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+//                        break;
+//                    }
+//
+//                    boolean status;
+//
+//                    if (robotData.getTurret().isFarToggled()) status = Math.abs(robotData.getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < robotData.getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+//                    else status = Math.abs(robotData.getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < robotData.getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
+//
+//                    //Only Shoot up to speed
+//                    if (status) robotData.getCarosel().subModeTransferStartTimer();
+//
+//                    robotData.getCarosel().checkShotSuccess();
+//
+//                    break;
+//
+//                default:
+//                    break;
+//            }
+//
+//            robotData.getCarosel().transferReceiveTimer();
+//
+//            return true;
+        }
+    }
+    public Action patternFireWaitSpeed(double disp) {
+        return new PatternFireWaitSpeed(disp);
+    }
+
     public class PatternFire implements Action {
 
         public double disp;
@@ -592,8 +698,19 @@ public class RoadRunnerDataV2{
         return new TurretPID();
     }
     public class TelemetryAuto implements Action{
+
+        LimeLightVision limeLightVision;
+
+        public TelemetryAuto(LimeLightVision limeLightVision){
+            this.limeLightVision = limeLightVision;
+        }
+
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
+
+            robotData.getTelemetry().addData("Starting Side", getRobotData().getStartingSide());
+            robotData.getTelemetry().addData("Starting Position", getRobotData().getStartingPosition());
+            robotData.getTelemetry().addData("Starting Color: ", limeLightVision.getAlliance());
 
             robotData.getCarosel().telemetryCarosel();
             robotData.getTelemetry().update();
@@ -601,8 +718,8 @@ public class RoadRunnerDataV2{
             return loopingActive;
         }
     }
-    public Action telemetryAuto(){
-        return new TelemetryAuto();
+    public Action telemetryAuto(LimeLightVision limeLightVision){
+        return new TelemetryAuto(limeLightVision);
     }
     public class IndicatorUpdate implements Action{
 
@@ -719,6 +836,7 @@ public class RoadRunnerDataV2{
         return Math.abs(heading - intendedHeading);
     }
     public boolean isPinpointHeadingCorrect(double heading){
+        if (heading < 0) heading += 360;
         return getPinpointHeadingError(heading) < RobotConstantsV2.PINPOINT_TOLERENCE * intendedHeading;
     }
     public void setIntendedHeading(double heading){
@@ -735,4 +853,16 @@ public class RoadRunnerDataV2{
     public boolean isOpenGateActive(){
         return openGateActive;
     }
+    public void resetDriveConstants(){
+        MecanumDrive.PARAMS.maxWheelVel = RobotConstantsV2.MAX_VEL_DEFAULT;
+        MecanumDrive.PARAMS.minProfileAccel = RobotConstantsV2.MIN_ACCEL_DEFAULT;
+        MecanumDrive.PARAMS.maxProfileAccel = RobotConstantsV2.MAX_ACCEL_DEFAULT;
+    }
+
+    public void steroidDriveConstants(){
+        MecanumDrive.PARAMS.maxWheelVel = RobotConstantsV2.MAX_VEL_SPEED;
+        MecanumDrive.PARAMS.minProfileAccel = RobotConstantsV2.MIN_ACCEL_SPEED;
+        MecanumDrive.PARAMS.maxProfileAccel = RobotConstantsV2.MAX_ACCEL_SPEED;
+    }
+
 }

@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.RobotV2.TeleOp;
 import com.acmerobotics.roadrunner.Action;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.LimeLightVision;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RoadRunnerDataV2;
@@ -17,7 +18,10 @@ public class DriverControlBlue extends OpMode {
     private RobotDataV2 robotData;         //Basic Robot Mechanics
     private LimeLightVision limelight;     //Lime Light Implementation
 
-    //Runs Once on Init
+    private ElapsedTime testLoopTime;
+    private double loopTime = 0;
+    private boolean loopCheck = false;
+
     @Override
     public void init(){
 
@@ -64,11 +68,19 @@ public class DriverControlBlue extends OpMode {
         robotData.getCarosel().forceTransferDown();
         rrData.updateRobotData(robotData);
         RobotDataV2.createRuntime();
+        testLoopTime = new ElapsedTime();
     }
 
     //Loops after Start
     @Override
     public void loop(){
+
+        if (gamepad2.leftBumperWasPressed()){
+            testLoopTime.reset();
+            loopCheck = true;
+        }
+
+        //robotData.getCarosel().updateInventory();
 
         /** Important First Updates */
         robotData.getDriveTrain().setGamepad(gamepad1);
@@ -112,14 +124,14 @@ public class DriverControlBlue extends OpMode {
 
                         //Auto cycling Not Active When the intake is on
                         if (robotData.getCarosel().isIntakeMotorOn()){
-                            robotData.getCarosel().autoIntakeCycle(); //TODO only issue with this is that robot doens't sort when not active
+                            robotData.getCarosel().autoIntakeCycle();
                         }
                         else{
                             if (gamepad1.squareWasPressed()) robotData.getCarosel().cycleCaroselManual();
                         }
                     }
 
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),limelight);
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.CLOSE_BALL_DISTANCE,limelight);
 
                     break;
 
@@ -178,6 +190,7 @@ public class DriverControlBlue extends OpMode {
                         }
                         else{
                             robotData.getCarosel().autoIntakeCycle();
+                            //robotData.getCarosel().cycleCaroselManual();
                         }
                     }
                     robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0, limelight);
@@ -210,17 +223,6 @@ public class DriverControlBlue extends OpMode {
         }
 
         /** Road Runner */
-
-        //Auto Align
-//        if (gamepad1.leftBumperWasPressed() && gamepad2.left_trigger > 0.5) {
-//            if (gamepad1.left_trigger > 0.1 && gamepad1.left_trigger < 0.5){
-//                rrData.killTeleOpActions();
-//                rrData.addTeleopAction(rrData.getAlignTrajectory(limelight.getFidYaw()));
-//            }
-//            else if (gamepad1.left_trigger >= 0.5){
-//                rrData.runCurrentTeleOpAction();
-//            }
-//        }
 
         //Auto Align
         if (gamepad1.left_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
@@ -395,6 +397,7 @@ public class DriverControlBlue extends OpMode {
 
         /** Emergency Abort */
         if (gamepad1.dpadDownWasPressed() || gamepad1.leftBumperWasPressed()){
+            LimeLightVision.isFoundMotif = false;
             robotData.getDriveTrain().endSubMode();
             robotData.getCarosel().wipeInventory();
             //RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
@@ -459,6 +462,13 @@ public class DriverControlBlue extends OpMode {
 
         /** Rumbling */
         robotData.getDriveTrain().checkEndgame();
+
+        if (loopCheck){
+            loopTime = testLoopTime.milliseconds();
+            loopCheck = false;
+        }
+
+        telemetry.addData("Last Loop Interval: ", loopTime);
 
         telemetry.update();
     }

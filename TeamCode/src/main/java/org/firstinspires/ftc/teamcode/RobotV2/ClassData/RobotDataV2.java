@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.graphics.Color;
 
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.InstantAction;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -13,6 +15,8 @@ import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.robot.Robot;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -285,7 +289,6 @@ public class RobotDataV2 {
                                 getCarosel().cycleRapidFire();
 
                                 if (getCarosel().isCaroselInPlace()){
-                                    //getCarosel().resetShotSuccess();
                                     getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
                                     getCarosel().activateTransferInProg();
                                     getCarosel().startPreTransferCooldown();
@@ -306,14 +309,6 @@ public class RobotDataV2 {
                                 break;
                             }
 
-                            boolean status = true;
-
-                            if (getTurret().isFarToggled()) status = Math.abs(getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-                            else status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-
-                            //Only Shoot up to speed
-                            //getCarosel().checkShotSuccess();
-
                             break;
 
                         default:
@@ -324,6 +319,8 @@ public class RobotDataV2 {
                     break;
 
                 case ("sortedFire"):
+
+                    //getCarosel().updateInventory();
 
                     if (getCarosel().getSortedFireCurrentShotCount() >= getCarosel().getMaxShots() && !getCarosel().isTransferCooldownActive()) {
                         getDriveTrain().endSubMode();
@@ -350,11 +347,6 @@ public class RobotDataV2 {
 
                         case ("transfer"):
 
-                            //!shotSucceed &&
-                            //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
-                            boolean status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-
-                            //Only Shoot up to speed
                             getCarosel().subModeTransferStartTimer();
 
                             if (getCarosel().isFailsafeSubmode()){
@@ -364,8 +356,6 @@ public class RobotDataV2 {
                                 getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
                                 break;
                             }
-
-                            //getCarosel().checkShotSuccess();
 
                             break;
 
@@ -412,12 +402,6 @@ public class RobotDataV2 {
                     break;
 
                 case ("transfer"):
-
-                    //!shotSucceed &&
-                    //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
-                    boolean status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-
-                    //Only Shoot up to speed
                     getCarosel().subModeTransferStartTimer();
 
                     if (getCarosel().isFailsafeSubmode()){
@@ -428,7 +412,55 @@ public class RobotDataV2 {
                         break;
                     }
 
-                    //getCarosel().checkShotSuccess();
+                    break;
+
+                default:
+                    break;
+            }
+
+            return true;
+        }
+        public boolean executePatternFireAutoFar(double distance){
+            getCarosel().updateCaroselEncoder();
+            getTurret().aimBall(distance);
+
+            if (getCarosel().getSortedFireCurrentShotCount() >= getCarosel().getMaxShots() && !getCarosel().isTransferCooldownActive()) {
+                getCarosel().transferReceiveTimer();
+                getCarosel().resetSortedFireCurrentShotCount();
+                getDriveTrain().endSubMode();
+                getCarosel().cycleOrigin();
+                return false;
+            }
+
+            switch (getCarosel().getCurrentSubModeQueue()) {
+                case ("cycle"):
+
+                    if (!getCarosel().isTransferCooldownActive()) {
+
+                        getCarosel().cycleSortedFire(getCarosel().getSortedFireCurrentShotCount());
+
+                        if (getCarosel().isCaroselInPlace()) {
+                            //getCarosel().resetShotSuccess();
+                            getCarosel().setSubModeQueue((RobotConstantsV2.subModeStages[1]));
+                            getCarosel().activateTransferInProg();
+                            getCarosel().startPreTransferCooldown();
+                        }
+                    }
+
+                    break;
+
+                case ("transfer"):
+
+                    boolean status = getTurret().isUpToSpeed(RobotConstantsV2.FAR_BALL_DISTANCE);
+                    if (status) getCarosel().subModeTransferStartTimer();
+
+                    if (getCarosel().isFailsafeSubmode()){
+                        getCarosel().endFailsafeSubmode();
+                        getCarosel().incrementSortedFireCurrentShotCount();
+                        getCarosel().activatePatternInProg();
+                        getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
+                        break;
+                    }
 
                     break;
 
@@ -469,7 +501,7 @@ public class RobotDataV2 {
                 case ("transfer"):
 
                     getCarosel().subModeTransferStartTimer();
-                    //|| getCarosel().getShotSuccessInstant()!getCarosel().detectedArtifact()  ||
+
                     if (getCarosel().isFailsafeSubmode()){
                         getCarosel().endFailsafeSubmode();
                         getCarosel().incrementRapidFireCurrentShotCount();
@@ -477,14 +509,6 @@ public class RobotDataV2 {
                         getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
                         break;
                     }
-
-                    boolean status = true;
-
-                    if (getTurret().isFarToggled()) status = Math.abs(getTurret().getTPSError(RobotConstantsV2.FAR_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.FAR_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-                    else status = Math.abs(getTurret().getTPSError(RobotConstantsV2.CLOSE_BALL_DISTANCE)) < getTurret().getTPS(RobotConstantsV2.CLOSE_BALL_DISTANCE) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
-
-                    //Only Shoot up to speed
-                    //getCarosel().checkShotSuccess();
 
                     break;
 
@@ -642,8 +666,6 @@ public class RobotDataV2 {
             telemetry.addData("Time: ", Math.floor(getRuntime()) + " Seconds");
             telemetry.addData("Current Mode: ", currentMode);
             telemetry.addData("Current Sub Mode: ", currentSubMode);
-
-            telemetry.addLine("\n------------------------------------\n");
 
         }
     }
@@ -938,8 +960,6 @@ public class RobotDataV2 {
             telemetry.addData("Displacement (m): ", disp);
             telemetry.addData("Angle: ", getAngleTotal(disp));
 
-            telemetry.addLine("\n------------------------------------\n");
-
         }
         public void telemetryTurretBasic(){
             telemetry.addData("Turret On: ", toggleTurretAim);
@@ -972,8 +992,8 @@ public class RobotDataV2 {
         /** Sensors */
         private Servo indicatorOne;
         private Servo indicatorTwo;
-        private ColorSensor colorSensorFront;
-        private ColorSensor colorSensorBack;
+        private NormalizedColorSensor colorSensorFront;
+        private NormalizedColorSensor colorSensorBack;
         private DistanceSensor colorSensorFrontDist;
         private DistanceSensor colorSensorBackDist;
         private AnalogInput rangerSensor;
@@ -1030,8 +1050,12 @@ public class RobotDataV2 {
             /** Sensors Init */
             indicatorOne = hardwareMap.get(Servo.class,"indicatorOne");
             indicatorTwo = hardwareMap.get(Servo.class,"indicatorTwo");
-            colorSensorFront = hardwareMap.get(ColorSensor.class,"colorSensorFront");
-            colorSensorBack  = hardwareMap.get(ColorSensor.class,"colorSensorBack");
+            colorSensorFront = hardwareMap.get(NormalizedColorSensor.class,"colorSensorFront");
+            colorSensorBack  = hardwareMap.get(NormalizedColorSensor.class,"colorSensorBack");
+
+            colorSensorFront.setGain(RobotConstantsV2.SENSOR_GAIN);
+            colorSensorBack.setGain(RobotConstantsV2.SENSOR_GAIN);
+
             colorSensorFrontDist = hardwareMap.get(DistanceSensor.class,"colorSensorFront");
             colorSensorBackDist = hardwareMap.get(DistanceSensor.class,"colorSensorBack");
 
@@ -1092,6 +1116,11 @@ public class RobotDataV2 {
         /** Autonomous */
         public void setInventoryAuto(){
             inventory = new String[]{"Green","Purple","Purple"};
+        }
+        public void forceFeedInventory(String color1, String color2, String color3){
+            getCarosel().getInventory()[0] = color1;
+            getCarosel().getInventory()[1] = color2;
+            getCarosel().getInventory()[2] = color3;
         }
 
 
@@ -1345,18 +1374,22 @@ public class RobotDataV2 {
         public void updateInventory(){
             //Won't override updates
             //TODO remove transfer in prog if its buggy
-            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") || !isCaroselInPlace()){
+            //inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") ||
+            if (!isCaroselInPlace()){
                 return;
             }
 
-            if (detectedArtifactFront()){
+            if (inventory[currentCycle].equals("Empty")){
                 inventory[currentCycle] = getColorFront();
-                return;
             }
 
-            if (detectedArtifactBack()){
+            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
+                if (getColorBack().equals("Empty")) return;
                 inventory[currentCycle] = getColorBack();
             }
+
+            //inventory[currentCycle] = getColorFront();
+
         }
         public void wipeInventory(){
             inventory = new String[]{"Empty","Empty","Empty"};
@@ -1388,9 +1421,7 @@ public class RobotDataV2 {
             //Only Activates Once
             //TODO incrementRapidFireCurrentShotCount(); TRANSFER
             if (cycleInProg){
-                if (!detectedArtifact()){
-                    cycleCaroselManual();
-                }
+                if (getCarosel().getRapidFireCurrentShotCount() != 0) cycleCaroselManual();
                 cycleInProg = false;
             }
         }
@@ -1419,7 +1450,10 @@ public class RobotDataV2 {
             if (autoIntakeCooldownActive && autoIntakeCoolDown.milliseconds() > RobotConstantsV2.AUTO_CYCLE_COOLDOWN){
                 autoIntakeCooldownActive = false;
 
-                if (inventory[currentCycle].equals("Empty") && detectedArtifact()) inventory[currentCycle] = "Purple"; //Failsafe
+                if (inventory[currentCycle].equals("Empty") && detectedArtifact()){
+                    inventory[currentCycle] = "Purple"; //Failsafe
+                }
+
 
                 if (isEmptySpot()) cycleCarosel(getEmptySpot());
             }
@@ -1438,16 +1472,23 @@ public class RobotDataV2 {
 //            }
 //        }
 
-        public void cycleCarosel(int desiredCycle){ //TODO Temp
+        public void cycleCarosel(int desiredCycle){
             if (!transferCooldownActive){
                 double increm = RobotConstantsV2.caroselPositions[desiredCycle] + RobotConstantsV2.CAROSEL_TOUCHPAD / 100.0;
                 currentCycle = desiredCycle;
                 caroselServoPos.setPosition(increm);
             }
         }
+
+        public boolean isCompleteEmpty(){
+            return inventory[0].equals("Empty") && inventory[1].equals("Empty") && inventory[2].equals("Empty");
+        }
+
         public void cyclePattern(int number){
             int slot = getInvPosition(pattern[number]);
             //int trashArtifact = getNearestUselessArtifact();
+
+            if (isCompleteEmpty()) return;
 
             if (slot == -1){
                 //if (trashArtifact != -1) cycleCarosel(trashArtifact);
@@ -1599,13 +1640,19 @@ public class RobotDataV2 {
         public float[] getHSVFront(){
 
             float[] hsv = new float[]{0F,0F,0F};
-            Color.RGBToHSV(colorSensorFront.red()*255, colorSensorFront.green()*255, colorSensorFront.blue()*255, hsv);
+
+            NormalizedRGBA colors = colorSensorFront.getNormalizedColors();
+
+            Color.RGBToHSV((int) (colors.red *255), (int) (colors.green *255), (int) (colors.blue * 255), hsv);
             return hsv;
         }
         public float[] getHSVBack(){
 
             float[] hsv = new float[]{0F,0F,0F};
-            Color.RGBToHSV(colorSensorBack.red()*255, colorSensorBack.green()*255, colorSensorBack.blue()*255, hsv);
+
+            NormalizedRGBA colors = colorSensorBack.getNormalizedColors();
+
+            Color.RGBToHSV((int)(colors.red *255), (int)(colors.green *255), (int)(colors.blue * 255), hsv);
             return hsv;
         }
         public double getRangerDistance(){
@@ -1627,38 +1674,60 @@ public class RobotDataV2 {
 
 
         public String getColorBack() { //TODO here issue with megging
-            if (detectedArtifactBack()) {
-                float[] HSV = getHSVBack();
+//            if (detectedArtifactBack()) {
+//                float[] HSV = getHSVBack();
+//
+//                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S){
+//                    return "Green";
+//                }
+//
+//                else{
+//                    return "Purple";
+//                }
+//            }
+            float[] HSV = getHSVBack();
 
-                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S && HSV[2] >= RobotConstantsV2.MIDDLE_V){
-                    return "Green";
-                }
-
-                else{
-                    return "Purple";
-                }
+            //&& HSV[2] >= RobotConstantsV2.MIN_V
+            if (detectedArtifactBack()){
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Green";}
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Purple";}
             }
-
             return "Empty";
         }
 
         public boolean detectedArtifactFront(){
             return colorSensorFrontDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD_FRONT && isCaroselInPlace();
+
+            //float[] HSV = getHSVFront();
+            //return HSV[1] > RobotConstantsV2.MIN_S && HSV[2] > RobotConstantsV2.MIN_V;
         }
         public boolean detectedArtifactBack(){
             return colorSensorBackDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD_BACK && isCaroselInPlace();
+
+            //float[] HSV = getHSVBack();
+            //return HSV[1] > RobotConstantsV2.MIN_S && HSV[2] > RobotConstantsV2.MIN_V;
         }
         public String getColorFront(){
-            if (detectedArtifactFront()) {
-                float[] HSV = getHSVFront();
 
-                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIDDLE_S && HSV[2] >= RobotConstantsV2.MIDDLE_V){
-                    return "Green";
-                }
+            //TODO old method
 
-                else{
-                    return "Purple";
-                }
+//            if (detectedArtifactFront()) {
+//                float[] HSV = getHSVFront();
+//
+//                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){
+//                    return "Green";
+//                }
+//
+//                else{
+//                    return "Purple";
+//                }
+//            }
+
+            float[] HSV = getHSVFront();
+
+            if (detectedArtifactFront()){
+                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Green";}
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Purple";}
             }
 
             return "Empty";
@@ -1675,14 +1744,15 @@ public class RobotDataV2 {
             switch (mode){
                 case("auto"):
 
-                    if (!limelight.getResults().isValid()){
-                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
-                    }
+//                    if (!limelight.getResults().isValid()){
+//                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
+//                    }
 
+                    disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
 //                    if (!limelight.canSeeSomeAT() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
 //                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
 //                    }
-                    if (!limelight.canSeeSomeAT() || !turret.isToggleTurretAim() || !getTurret().isUpToSpeed(disp)){
+                    if (!turret.isToggleTurretAim() || !getTurret().isUpToSpeed(disp)){
                         indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                     }
                     else{
@@ -1781,23 +1851,22 @@ public class RobotDataV2 {
 
             telemetry.addLine("Carosel \n");
 
-
             telemetry.addData("Detected ART: ", detectedArtifact());
-            telemetry.addData("Ranger Dist: ", getRangerDistance());
+            //telemetry.addData("Ranger Dist: ", getRangerDistance());
             //telemetry.addData("Analog Ranger:", rangerSensor.getVoltage());
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
             telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern[0], pattern[1], pattern[2]));
-            float[] HSVFront = getHSVFront();
-            telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
-            float[] HSVBack = getHSVBack();
-            telemetry.addLine(String.format("HSV Back: (%.5f, %.5f, %.5f)", HSVBack[0], HSVBack[1], HSVBack[2]));
+//            float[] HSVFront = getHSVFront();
+//            telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
+//            float[] HSVBack = getHSVBack();
+//            telemetry.addLine(String.format("HSV Back: (%.5f, %.5f, %.5f)", HSVBack[0], HSVBack[1], HSVBack[2]));
 
             telemetry.addData("Current Cycle: ", currentCycle);
-            telemetry.addData("Distance Front: ", colorSensorFrontDist.getDistance(DistanceUnit.CM));
-            telemetry.addData("Color Front: ", getColorFront());
-            telemetry.addData("Distance Back: ", colorSensorBackDist.getDistance(DistanceUnit.CM));
-            telemetry.addData("Color Back: ", getColorBack());
-            telemetry.addData("IN Place: ", isCaroselInPlace());
+//            telemetry.addData("Distance Front: ", colorSensorFrontDist.getDistance(DistanceUnit.CM));
+//            telemetry.addData("Color Front: ", getColorFront());
+//            telemetry.addData("Distance Back: ", colorSensorBackDist.getDistance(DistanceUnit.CM));
+//            telemetry.addData("Color Back: ", getColorBack());
+            //telemetry.addData("IN Place: ", isCaroselInPlace());
 //            telemetry.addData("Detected Back: ", detectedArtifactBack());
 ////            telemetry.addData("Detected Front: ", detectedArtifactFront());
 //

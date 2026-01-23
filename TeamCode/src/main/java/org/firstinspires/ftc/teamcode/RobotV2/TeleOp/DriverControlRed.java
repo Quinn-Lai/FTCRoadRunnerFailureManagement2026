@@ -17,9 +17,13 @@ public class DriverControlRed extends OpMode {
     private RobotDataV2 robotData;         //Basic Robot Mechanics
     private LimeLightVision limelight;     //Lime Light Implementation
 
-    //Runs Once on Init
+    //Runs Once on InitrrData.cycleFirstPattern()
     @Override
     public void init(){
+
+        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = 200;
+        RobotConstantsV2.COOLDOWN_SHOT = 200; //Transfer Shot
+        RobotConstantsV2.COOLDOWN_PRE_SHOT = 0;
 
         robotData = new RobotDataV2(hardwareMap, telemetry);
         rrData = new RoadRunnerDataV2(robotData);
@@ -65,6 +69,8 @@ public class DriverControlRed extends OpMode {
     //Loops after Start
     @Override
     public void loop(){
+
+        //robotData.getCarosel().updateInventory();
 
         /** Important First Updates */
         robotData.getDriveTrain().setGamepad(gamepad1);
@@ -115,7 +121,7 @@ public class DriverControlRed extends OpMode {
                     }
                 }
 
-                robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),limelight.getDisp(),limelight);
+                robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.CLOSE_BALL_DISTANCE,limelight);
 
                 break;
 
@@ -208,12 +214,59 @@ public class DriverControlRed extends OpMode {
         /** Road Runner */
 
         //Auto Align
-        if (gamepad1.leftBumperWasPressed() && gamepad2.left_trigger > 0.5) {
+//        if (gamepad1.leftBumperWasPressed() && gamepad2.left_trigger > 0.5) {
+//            if (gamepad1.left_trigger > 0.1 && gamepad1.left_trigger < 0.5){
+//                rrData.killTeleOpActions();
+//                rrData.addTeleopAction(rrData.getAlignTrajectory(limelight.getFidYaw()));
+//            }
+//            else if (gamepad1.left_trigger >= 0.5){
+//                rrData.runCurrentTeleOpAction();
+//            }
+//        }
+
+        //Auto Align
+        if (gamepad1.left_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
+            rrData.requestAlign(limelight.getFidYaw());
+            rrData.runCurrentTeleOpAction();
         }
 
         //Auto Park
-        else if (gamepad1.leftBumperWasPressed() && gamepad1.right_trigger > 0.5){
+        else if (gamepad1.right_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
+            rrData.requestPark(limelight.getAlliance());
+            rrData.runCurrentTeleOpAction();
         }
+
+        //Reset Start Up
+        else{
+            rrData.setTeleOpActionActive(false);
+            robotData.getDriveTrain().omniDrive();
+        }
+
+//        if (gamepad1.left_bumper){
+//            if (gamepad1.left_trigger > 0.1){
+//                rrData.requestAlign();
+//                rrData.addTeleopAction(rrData.getAlignTrajectory(limelight.getFidYaw()));
+//            }
+//            else if (gamepad1.right_trigger > 0.1){
+//                rrData.runCurrentTeleOpAction();
+//            }
+//        }
+//
+//        //Auto Park
+//        if (gamepad1.left_bumper){
+//            if (gamepad1.left_trigger > 0.1){
+//                rrData.requestPark(limelight.getAlliance());
+//                rrData.addTeleopAction(rrData.getParkingTrajectory(limelight.getAlliance()));
+//            }
+//            else if (gamepad1.right_trigger > 0.1){
+//                rrData.runCurrentTeleOpAction();
+//            }
+//        }
+//
+//        else{
+//            robotData.getDriveTrain().omniDrive();
+//        }
+
 
         /** Sub Modes */
 
@@ -343,9 +396,11 @@ public class DriverControlRed extends OpMode {
         robotData.getCarosel().transferReceiveTimer();
 
         /** Emergency Abort */
-        if (gamepad1.dpadDownWasPressed()){
+        if (gamepad1.dpadDownWasPressed() || gamepad1.leftBumperWasPressed()){
             robotData.getDriveTrain().endSubMode();
-            RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
+            robotData.getCarosel().wipeInventory();
+            LimeLightVision.isFoundMotif = false;
+            //RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
         }
 
         //-----------------------------------------------------
@@ -368,7 +423,6 @@ public class DriverControlRed extends OpMode {
         robotData.getCarosel().updatePattern(LimeLightVision.motifCode);
         robotData.getDriveTrain().updateModeColor();
         robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
-        robotData.getDriveTrain().omniDrive();
 
         /** Telemetry */
         robotData.getDriveTrain().telemetryDriveTrain();

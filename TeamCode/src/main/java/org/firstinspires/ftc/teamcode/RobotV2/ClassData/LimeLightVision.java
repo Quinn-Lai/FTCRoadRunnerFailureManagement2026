@@ -164,7 +164,7 @@ public class LimeLightVision {
 
             for (LLResultTypes.FiducialResult f : fiducials) {
                 if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
-                    return f.getTargetXDegreesNoCrosshair() + f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES);
+                    return f.getTargetXDegreesNoCrosshair(); //+ f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES)
                     //f.getRobotPoseFieldSpace().getOrientation().getYaw()
                 }
             }
@@ -263,6 +263,16 @@ public class LimeLightVision {
             alliance = "blue";
             limelight.pipelineSwitch(0);
         }
+    }
+
+    public void forceAllianceRed(){
+        alliance = "red";
+        limelight.pipelineSwitch(1);
+    }
+
+    public void forceAllianceBlue(){
+        alliance = "blue";
+        limelight.pipelineSwitch(0);
     }
 
 }

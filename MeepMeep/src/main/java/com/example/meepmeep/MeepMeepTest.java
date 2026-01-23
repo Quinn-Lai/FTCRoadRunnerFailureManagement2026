@@ -64,11 +64,11 @@ public class MeepMeepTest {
                 .setTangent(Math.toRadians(270))
                 .splineToLinearHeading(shootingPos,Math.toRadians(270))
 
-                .setTangent(Math.toRadians(0))
-                .splineToLinearHeading(lineMid, Math.toRadians(90))
-
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(gate, Math.toRadians(270))
+                .turn(Math.toRadians(30))
                 .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(gate,Math.toRadians(90))
+                .splineToLinearHeading(lineMid, Math.toRadians(90))
 
                 .setTangent(Math.toRadians(270))
                 .splineToLinearHeading(shootingPos,Math.toRadians(180))
@@ -99,7 +99,7 @@ public class MeepMeepTest {
                 .turn(1)
                 .build();
 
-        myBot.runAction(closeSideBlue);
+        myBot.runAction(closeSideRed);
 
         meepMeep.setBackground(MeepMeep.Background.FIELD_DECODE_OFFICIAL)
                 .setDarkMode(true)
