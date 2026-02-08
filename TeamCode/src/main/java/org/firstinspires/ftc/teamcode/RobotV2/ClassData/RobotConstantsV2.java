@@ -15,18 +15,22 @@ public class RobotConstantsV2 {
     private static final double conversionFactor = 355 / analogVoltage;
     public static final double encoderRes = conversionFactor * netCaroselGearRatio;
     public static final int caroselMultiplier = 100; //Manual Control
-    public static final int CAROSEL_TOLERANCE = 1;
-    public static int CAROSEL_INCREMENT = (int) encoderRes / 3; //Amount of bonus to add per unit of cycle
-    public  static int CAROSEL_GLOBAL_INCREMENT = 0; //Position move relative to origin
+    public static int CAROSEL_TOLERANCE = 13;
+    public static int CAROSEL_TOLERANCE_TELE = 13;
+    public static int CAROSEL_TOLERANCE_AUTO = 13;
+    public static final int CAROSEL_INCREMENT = (int) encoderRes / 3; //Amount of bonus to add per unit of cycle
+    public static int CAROSEL_GLOBAL_INCREMENT = 0; //Position move relative to origin
     public static int CAROSEL_TOUCHPAD = 0;
     public static Double[] caroselPositions = new Double[]{0.07,0.45,0.82};
 
     /** Physics */
     public static double dragMultiplier = 2.55;
+    public static double VERTICAL_MULTIPLIER = 1.05;
     public static int ANGLE_BONUS = 0;
-    public static  double FAR_BALL_DISTANCE = 3.15;
-    public static final double CLOSE_BALL_DISTANCE = 1.35; //1.35
+    public static double FAR_BALL_DISTANCE = 3.15;
+    public static double CLOSE_BALL_DISTANCE = 1.35;
     public static double HEIGHT_TO_AIM = 1.15;
+    public static double MAX_TURRET_TPS = 2300;
 
     /** Transfer */
     public static final double TRANSFER_UP = 0.65;
@@ -34,13 +38,19 @@ public class RobotConstantsV2 {
     public static final int AUTO_CYCLE_COOLDOWN = 0;
 
     /** COOLDOWNS */
-    public static int FAILSAFE_SUBMODE_TIMER = 200;
-    public static int COOLDOWN_SHOT = 200;
-    public static int COOLDOWN_PRE_SHOT = 0;
 
-    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 200;
-    public static int COOLDOWN_SHOT_AUTO = 200;
-    public static int COOLDOWN_PRE_SHOT_AUTO = 0;
+    public static int FAILSAFE_SUBMODE_TIMER_TELE = 0; //200
+    public static int COOLDOWN_SHOT_TELE = 80; //200
+    public static int COOLDOWN_PRE_SHOT_TELE = 0; //0
+
+
+    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 0; //200
+    public static int COOLDOWN_SHOT_AUTO = 200; //200
+    public static int COOLDOWN_PRE_SHOT_AUTO = 0; //0
+
+    public static int FAILSAFE_SUBMODE_TIMER = FAILSAFE_SUBMODE_TIMER_TELE;
+    public static int COOLDOWN_SHOT = COOLDOWN_SHOT_TELE; //
+    public static int COOLDOWN_PRE_SHOT = COOLDOWN_PRE_SHOT_TELE; //0
 
 //    public static int FAILSAFE_SUBMODE_TIMER_AUTO = 100;
 //    public static int COOLDOWN_SHOT_AUTO = 300;
@@ -56,12 +66,18 @@ public class RobotConstantsV2 {
     public static final int RANGER_DETECTION_MIN_THRESHOLD = 5;
     public static final int RANGER_DETECTION_MAX_THRESHOLD = 15;
     public static final int RANGER_DETECTION_CONFIRM_SHOT = 16;
-    public static final int COLOR_SENSOR_DIST_THRESHOLD_FRONT = 1;
-    public static final double COLOR_SENSOR_DIST_THRESHOLD_BACK = 4;
+    public static final double COLOR_SENSOR_DIST_THRESHOLD_FRONT = 1.5;
+    public static final double COLOR_SENSOR_DIST_THRESHOLD_BACK = 3.1;
 
+    /** PID Constants*/
+
+    public static double kP = 0.005;
+    public static double kI = 0.0000005;
+    public static double kD = 0.0000005;
+    public static double kF = 0.00035;
     public static double kPC = 0.0019;
-    public static double kIC = 0.000021; //0.000005
-    public static double kDC = 0.013; //0.13
+    public static double kIC = 0.000021;
+    public static double kDC = 0.013;
 
     /** Modes */
     public static final String[] mainModes = new String[]{"auto","manual","humanIntake"};
@@ -73,9 +89,9 @@ public class RobotConstantsV2 {
     public static final int HUMAN_INTAKE_SPEED = 670;
     public static final int KILL_SHOOTER_SPEED = 0;
     public static final double FAR_TPS = 1600;
-    public static final double MAX_HOOD_ANGLE = 64.79;
-    public static final double MIN_HOOD_ANGLE = 51.3;
-    public static final double MIN_HOOD_ANGLE_POS = 0.3;
+    public static final double MAX_HOOD_ANGLE = 51.3;
+    public static final double MIN_HOOD_ANGLE = 32;
+    public static final double MIN_HOOD_ANGLE_POS = 0.65;
     public static final double MAX_HOOD_ANGLE_POS = 0.75;
     public static final double SHOOTER_SPEED_THRESHOLD = 0.03; //Ready if shooter is within 3% of intended speed
 
@@ -107,18 +123,18 @@ public class RobotConstantsV2 {
     public static double ANGLE_TOLERENCE_AUTO = 2;
 
     /** Auto StartPos*/
-    public static final Pose2d BLUE_SPAWN_FAR = new Pose2d(61.065+4, -13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_BLUE));
-    public static final Pose2d BLUE_SHOOT_FAR = new Pose2d(51+4, -13, Math.toRadians(203));
+    public static final Pose2d BLUE_SPAWN_FAR = new Pose2d(61.065, -13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_BLUE));
+    public static final Pose2d BLUE_SHOOT_FAR = new Pose2d(51, -13, Math.toRadians(203));
     public static final Pose2d BLUE_SPAWN_CLOSE = new Pose2d(-52, -48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE));
     public static final Pose2d BLUE_SHOOT_CLOSE = new Pose2d(-15, -15, Math.toRadians(227)); //225
-    public static final Pose2d OFF_LINE_BLUE_SHOOT_CLOSE = new Pose2d(-20, -15, Math.toRadians(230)); //225
+    public static final Pose2d OFF_LINE_BLUE_SHOOT_CLOSE = new Pose2d(-30, -15, Math.toRadians(238)); //225
 
-
-    public static final Pose2d RED_SPAWN_FAR = new Pose2d(61.065+4, 13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_RED));
-    public static final Pose2d RED_SHOOT_FAR = new Pose2d(51+4, 13, Math.toRadians(157));
+    //+4
+    public static final Pose2d RED_SPAWN_FAR = new Pose2d(61.065, 13, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_FAR_RED));
+    public static final Pose2d RED_SHOOT_FAR = new Pose2d(51, 13, Math.toRadians(157));
     public static final Pose2d RED_SPAWN_CLOSE = new Pose2d(-52, 48.5, Math.toRadians(RobotConstantsV2.PINPOINT_HEADING_CLOSE_RED));
     public static final Pose2d RED_SHOOT_CLOSE = new Pose2d(-15, 15, Math.toRadians(133)); //135
-    public static final Pose2d OFF_LINE_RED_SHOOT_CLOSE = new Pose2d(-20, 15, Math.toRadians(130)); //135
+    public static final Pose2d OFF_LINE_RED_SHOOT_CLOSE = new Pose2d(-30, 15, Math.toRadians(122)); //135
 
 
 
@@ -142,9 +158,13 @@ public class RobotConstantsV2 {
     public final static Pose2d LINE_TOP_COLLECT_BLUE = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, -RobotConstantsV2.INTAKE_TRAVEL-2, Math.toRadians(270));
     public final static Pose2d GATE_LINE_MID_PREP_BLUE = new Pose2d(11, -RobotConstantsV2.PREP_TRAVEL, Math.toRadians(270));
     public final static Pose2d GATE_OPEN_POSITION_BLUE =  new Pose2d(11, -52, Math.toRadians(270));
-    public final static Pose2d COLLECT_GATE_CLOSE_BLUE = new Pose2d(0,0,0);
+    public final static Pose2d COLLECT_GATE_CLOSE_BLUE = new Pose2d(9,-55, Math.toRadians(245));
     public final static Pose2d COLLECT_GATE_FAR_BLUE = new Pose2d(0,0,0);
-    public final static Pose2d SLAM_GATE_BLUE = new Pose2d(1,-53,Math.toRadians(270));
+    public final static Pose2d SLAM_GATE_BLUE = new Pose2d(3,-53,Math.toRadians(270));
+    public final static Pose2d PARK_GATE_BLUE = new Pose2d(3, -43, Math.toRadians(0));
+    public final static Pose2d CORNER_BLUE = new Pose2d(60, -60, Math.toRadians(315));
+    public final static Pose2d CORNER_RED = new Pose2d(60, 60, Math.toRadians(45));
+
 
     /** Auto Red Pos*/
     public final static Pose2d LINE_BOT_PREP_RED = new Pose2d(RobotConstantsV2.LINE_BOT_PREP_TRAVEL, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
@@ -155,13 +175,15 @@ public class RobotConstantsV2 {
     public final static Pose2d LINE_TOP_COLLECT_RED = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, RobotConstantsV2.INTAKE_TRAVEL+2, Math.toRadians(90));
     public final static Pose2d GATE_LINE_MID_PREP_RED = new Pose2d(11, RobotConstantsV2.PREP_TRAVEL, Math.toRadians(90));
     public final static Pose2d GATE_OPEN_POSITION_RED =  new Pose2d(11, 52, Math.toRadians(90));
-    public final static Pose2d COLLECT_GATE_CLOSE_RED = new Pose2d(0,0,0);
+    public final static Pose2d COLLECT_GATE_CLOSE_RED = new Pose2d(9,55,Math.toRadians(115));
     public final static Pose2d COLLECT_GATE_FAR_RED = new Pose2d(0,0,0);
-    public final static Pose2d SLAM_GATE_RED = new Pose2d(-1,53,Math.toRadians(90));
+    public final static Pose2d SLAM_GATE_RED = new Pose2d(3,53,Math.toRadians(90));
+    public final static Pose2d PARK_GATE_RED = new Pose2d(3, 43, Math.toRadians(0));
 
     /** Auto Speed Control */
 
-    public static int MAX_ACCEL_SPEED = 150;
+    public static int MAX_ACCEL_SPEED_SLOWER = 90;
+    public static int MAX_ACCEL_SPEED = 100;
     public static int MIN_ACCEL_SPEED = -30; //-30
     public static int MAX_VEL_SPEED = 100;
     public static int MAX_ACCEL_DEFAULT = 50;
@@ -176,6 +198,10 @@ public class RobotConstantsV2 {
     public static final double TRIGGER_TOLERENCE = 0.3;
     public static final double PARKING_TOLERENCE = 1;
     public static final double PARKING_SPEED = 50;
+    public static final Double[] GLOBAL_GOAL_POS_RED = new Double[]{-61.0,53.0};
+    public static final Double[] GLOBAL_GOAL_POS_BLUE = new Double[]{-61.0,-53.0};
+    public static Pose2d LAST_ROBOT_POS = new Pose2d(0,0,0);
+
 
     /** HSV Values */
     public static int MIDDLE_H = 165; //170

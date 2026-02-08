@@ -34,6 +34,8 @@ public class AutoFarSide extends OpMode {
     @Override
     public void init(){
 
+        RoadRunnerDataV2.isAutoPosStored = false;
+
         RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
         RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO; //Transfer Shot
         RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
@@ -68,7 +70,7 @@ public class AutoFarSide extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU();
+        limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -272,7 +274,7 @@ public class AutoFarSide extends OpMode {
 
                 }
 
-                limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 
@@ -429,10 +431,11 @@ public class AutoFarSide extends OpMode {
                                 buildBear[1],
                                 buildBear[2],
                                 buildBear[3],
-                                buildBear[4],
-                                buildBear[5],
+//                                buildBear[4],
+//                                buildBear[5],
 
-                                rrData.setLooping(false)
+                                rrData.setLooping(false),
+                                rrData.killTurret()
                         )
                 )
         );
@@ -445,6 +448,9 @@ public class AutoFarSide extends OpMode {
 
     @Override
     public void stop() {
+
+        RoadRunnerDataV2.isAutoPosStored = true; //TODO rememeber
+        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
 
         rrData.setLooping(false);
 

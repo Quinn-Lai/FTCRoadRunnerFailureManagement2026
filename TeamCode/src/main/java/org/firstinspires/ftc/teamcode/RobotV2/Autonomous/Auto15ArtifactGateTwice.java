@@ -1,12 +1,10 @@
 package org.firstinspires.ftc.teamcode.RobotV2.Autonomous;
 
 import com.acmerobotics.dashboard.config.Config;
-import com.acmerobotics.roadrunner.AccelConstraint;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
-import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
@@ -19,9 +17,10 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
 
+/** Opens Gate Twice on First & Second Line Then Gate Intakes*/
 @Config
 @Autonomous
-public class AutoOverflow extends OpMode {
+public class Auto15ArtifactGateTwice extends OpMode {
 
     //Data Classes
     private LimeLightVision limeLight;
@@ -104,15 +103,13 @@ public class AutoOverflow extends OpMode {
                     Pose2d lineBot = RobotConstantsV2.LINE_BOT_PREP_BLUE;
                     Pose2d lineBotCollect = RobotConstantsV2.LINE_BOT_COLLECT_BLUE;
                     Pose2d lineMid = RobotConstantsV2.LINE_MID_PREP_BLUE;
-                    Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_BLUE;
+                    Pose2d lineMidCollect = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, -42, Math.toRadians(270));
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_BLUE;
-                    Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_BLUE;
-
-                    Pose2d collectFromGateClose = RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE;
-                    Pose2d collectFromGateFar = RobotConstantsV2.COLLECT_GATE_FAR_BLUE;
+                    Pose2d lineTopCollect = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, -43, Math.toRadians(270));
                     Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_BLUE;
 
                     //Close Side
+
                     rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE);
 
                     rrData.setBeginPose(RobotConstantsV2.BLUE_SPAWN_CLOSE);
@@ -135,9 +132,12 @@ public class AutoOverflow extends OpMode {
 
                     TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineTopCollect,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineTopCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(lineTopCollect)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_BLUE, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
+
+                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_BLUE)
                             .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(shootingPos,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),  new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
@@ -147,11 +147,26 @@ public class AutoOverflow extends OpMode {
 
                     TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED_SLOWER));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                            .setTangent(Math.toRadians(270))
+                            .splineToLinearHeading(gate,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
+
+                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(gate)
                             .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+
+                    //Gate Intake
+
+                    TrajectoryActionBuilder gateIntake = rrData.getDrive().actionBuilder(shootingPos)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder shootGate = rrData.getDrive().actionBuilder(RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE)
+                            .setTangent(Math.toRadians(90))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
 
                     TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                             .setTangent(Math.toRadians(0))
@@ -169,6 +184,7 @@ public class AutoOverflow extends OpMode {
                             .setTangent(Math.toRadians(0))
                             .splineToLinearHeading(RobotConstantsV2.PARK_GATE_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
+
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
                             shootFirst,
@@ -178,11 +194,17 @@ public class AutoOverflow extends OpMode {
                             middleLinePrep,
                             middleLineCollect,
                             shootThird,
+
+                            gateIntake,
+                            shootGate,
+
+
                             bottomLinePrep,
                             bottomLineCollect,
                             shootFourth,
                             parkGate
                     });
+
                 }
 
                 //Trajectory Right
@@ -190,12 +212,10 @@ public class AutoOverflow extends OpMode {
                     Pose2d lineBot = RobotConstantsV2.LINE_BOT_PREP_RED;
                     Pose2d lineBotCollect = RobotConstantsV2.LINE_BOT_COLLECT_RED;
                     Pose2d lineMid = RobotConstantsV2.LINE_MID_PREP_RED;
-                    Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_RED;
+                    Pose2d lineMidCollect = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, 42, Math.toRadians(90));
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_RED;
-                    Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_RED;
+                    Pose2d lineTopCollect = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, 43, Math.toRadians(90));;
 
-                    Pose2d collectFromGateClose = RobotConstantsV2.COLLECT_GATE_CLOSE_RED;
-                    Pose2d collectFromGateFar = RobotConstantsV2.COLLECT_GATE_FAR_RED;
                     Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_RED;
 
                     //Close Side
@@ -212,21 +232,22 @@ public class AutoOverflow extends OpMode {
 
                     //Each Route
 
-                    //330
-                    //315
                     TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                             .setTangent(Math.toRadians(330))
                             .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
                     TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
                             .setTangent(Math.toRadians(45))
-                            .splineToLinearHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
                     TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineTopCollect,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(lineTopCollect)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_RED, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
+
+                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_RED)
                             .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(shootingPos,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
@@ -236,9 +257,20 @@ public class AutoOverflow extends OpMode {
 
                     TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED_SLOWER));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
+                            .setTangent(Math.toRadians(90))
+                            .splineToLinearHeading(gate,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
+
+                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(gate)
+                            .setTangent(Math.toRadians(270))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder gateIntake = rrData.getDrive().actionBuilder(shootingPos)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.COLLECT_GATE_CLOSE_RED,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder shootGate = rrData.getDrive().actionBuilder(RobotConstantsV2.COLLECT_GATE_CLOSE_RED)
                             .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
@@ -267,6 +299,10 @@ public class AutoOverflow extends OpMode {
                             middleLinePrep,
                             middleLineCollect,
                             shootThird,
+
+                            gateIntake,
+                            shootGate,
+
                             bottomLinePrep,
                             bottomLineCollect,
                             shootFourth,
@@ -274,7 +310,7 @@ public class AutoOverflow extends OpMode {
                     });
                 }
 
-               // limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 
@@ -307,8 +343,8 @@ public class AutoOverflow extends OpMode {
             LimeLightVision.failsafeMotif();
         }
 
+        //Far side Auto
         rrData.getRobotData().getTurret().toggleTurretFar(false);
-
 
         SequentialAction collectFirstLine = new SequentialAction(
                 rrData.forceFeedCycle(forceFeedActive),
@@ -325,7 +361,6 @@ public class AutoOverflow extends OpMode {
         );
 
         SequentialAction shootFirstLine = new SequentialAction(
-                //new SleepAction(0.2),
                 rrData.getTrajectory(4),
                 rrData.intakeOff(),
                 rrData.waitForTurret(isWaitTurret),
@@ -357,22 +392,20 @@ public class AutoOverflow extends OpMode {
                 rrData.forceTransferDown()
         );
 
-        SequentialAction collectThirdLine = new SequentialAction(
+        SequentialAction intakeGate = new SequentialAction(
                 rrData.forceFeedCycle(forceFeedActive),
+
                 rrData.getTrajectory(8),
-                rrData.intakeOn(),
                 rrData.startFailsafeTimer(),
-                new ParallelAction(
-                        rrData.getTrajectory(9),
-                        rrData.checkAutoIntake()
-                ),
+                rrData.intakeOn(),
+                rrData.checkAutoIntake(),
+
                 rrData.intakeReverse(),
-                rrData.forceFeedInventory(forceFeedActive,"Green","Purple","Purple"),
                 rrData.cycleQuickSlot(patternEnabled)
         );
 
-        SequentialAction shootThirdLine = new SequentialAction(
-                rrData.getTrajectory(10),
+        SequentialAction shootGate = new SequentialAction(
+                rrData.getTrajectory(9),
                 rrData.intakeOff(),
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
@@ -381,22 +414,39 @@ public class AutoOverflow extends OpMode {
                 rrData.cycleQuickSlot(patternEnabled)
         );
 
-        SequentialAction collectCloseGate = new SequentialAction(
-
+        SequentialAction collectThirdLine = new SequentialAction(
+                rrData.forceFeedCycle(forceFeedActive),
+                rrData.getTrajectory(10),
+                rrData.intakeOn(),
+                rrData.startFailsafeTimer(),
+                new ParallelAction(
+                        rrData.getTrajectory(11),
+                        rrData.checkAutoIntake()
+                ),
+                rrData.intakeReverse(),
+                rrData.forceFeedInventory(forceFeedActive,"Green","Purple","Purple"),
+                rrData.cycleQuickSlot(patternEnabled)
         );
 
-        SequentialAction collectFarGate = new SequentialAction(
-
+        SequentialAction shootThirdLine = new SequentialAction(
+                rrData.getTrajectory(12),
+                rrData.intakeOff(),
+                rrData.waitForTurret(isWaitTurret),
+                rrData.requestArtifactShots(patternEnabled),
+                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.forceTransferDown(),
+                rrData.cycleQuickSlot(patternEnabled)
         );
-
 
         SequentialAction[] buildBear = new SequentialAction[]{
-                collectFirstLine,   //0
-                shootFirstLine,     //1
-                collectSecondLine,  //2
-                shootSecondLine,    //3
-                collectThirdLine,   //4
-                shootThirdLine,     //5
+                collectFirstLine,
+                shootFirstLine,
+                collectSecondLine,
+                shootSecondLine,
+                intakeGate,
+                shootGate,
+                collectThirdLine,
+                shootThirdLine,
         };
 
         rrData.setLoopStatus(true);
@@ -406,13 +456,10 @@ public class AutoOverflow extends OpMode {
 
                         //Repeated Stuff
 
-                        //rrData.updateCaroselEncoder(),
                         rrData.indicatorsUpdate(limeLight),
-                        //rrData.updateInveentory(),
                         rrData.turretPID(),
                         rrData.locateAprilTag(limeLight),
                         rrData.telemetryAuto(limeLight),
-
 
                         new SequentialAction(
 
@@ -420,7 +467,7 @@ public class AutoOverflow extends OpMode {
 
                                 new ParallelAction(
                                         rrData.getTrajectory(1),
-                                        rrData.waitForTurret(true)
+                                        rrData.waitForTurret(isWaitTurret)
                                 ),
 
                                 //First Ball
@@ -435,17 +482,18 @@ public class AutoOverflow extends OpMode {
                                 buildBear[3],
                                 buildBear[4],
                                 buildBear[5],
+                                buildBear[6],
+                                buildBear[7],
+
+                                rrData.setLooping(false),
 
                                 rrData.killTurret(),
-                                rrData.getTrajectory(11),
+                                rrData.getTrajectory(13),
                                 rrData.killTurret()
 
-                                )
+                        )
                 )
         );
-
-        //TODO op mode stop after if abort
-
     }
 
     @Override
@@ -456,14 +504,13 @@ public class AutoOverflow extends OpMode {
     @Override
     public void stop() {
 
-        RoadRunnerDataV2.isAutoPosStored = true; //TODO rememeber
-        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
-
         rrData.setLooping(false);
 
-        //RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
+        RoadRunnerDataV2.isAutoPosStored = true;
+        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
 
         telemetry.addLine("Autonomous Completed!");
+        telemetry.addData("Time Spent: ", RobotDataV2.getRuntime());
         telemetry.update();
 
         limeLight.killLimeLight();

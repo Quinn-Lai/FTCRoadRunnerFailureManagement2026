@@ -2,14 +2,14 @@ package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.graphics.Color;
 
-import com.acmerobotics.roadrunner.Action;
-import com.acmerobotics.roadrunner.InstantAction;
+import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.CRServo;
-import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -18,10 +18,10 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.robot.Robot;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.robotcore.external.matrices.GeneralMatrixF;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
@@ -169,9 +169,6 @@ public class RobotDataV2 {
         private DcMotor LBmotor;
         private DcMotor RBmotor;
 
-        /** Sensors */
-        private IMU imu;
-
         /** Driver Status */
         private boolean robotCentric;
         private Gamepad driver;
@@ -179,6 +176,8 @@ public class RobotDataV2 {
         /** Modes */
         private String currentMode;
         private String currentSubMode;
+        private double kPH;
+        private double lastErrorHeading;
 
         //----------------------------------------
 
@@ -211,14 +210,8 @@ public class RobotDataV2 {
             currentMode = RobotConstantsV2.mainModes[0];
             currentSubMode = RobotConstantsV2.subModes[2];
 
-            /** Field Centric */
-            if (!robotCentric){
-                imu = hardwareMap.get(IMU.class, "imu");
-                IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                        RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
-                        RevHubOrientationOnRobot.UsbFacingDirection.UP));
-                imu.initialize(parameters);
-            }
+            kPH = 0.005;
+            lastErrorHeading = 0;
         }
 
         //----------------------------------------
@@ -522,6 +515,19 @@ public class RobotDataV2 {
 
 
         /** Movement */
+        public void switchRobotCentric(){
+            if (robotCentric) robotCentric = false;
+            else robotCentric = true;
+        }
+
+        public void forceRobotCentricOn(){
+            robotCentric = true;
+        }
+
+        public void forceRobotCentricOff(){
+            robotCentric = false;
+        }
+
         public void powerMotorSafe(DcMotor motor, double targetPower){
             final double SLEW = 0.2;
             double currentPower = motor.getPower();
@@ -531,7 +537,7 @@ public class RobotDataV2 {
 
             motor.setPower(currentPower += limitedChange);
         }
-        public void omniDrive(){
+        public void omniDrive(RoadRunnerDataV2 rrData, LimeLightVision limeLightVision){
 
             double x = driver.left_stick_x;
             double y = -driver.left_stick_y;
@@ -555,87 +561,77 @@ public class RobotDataV2 {
 
             //Field POV
             else{
-                double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
 
-                // Rotate the movement direction counter to the bot's rotation
-                double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
-                double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+                double desiredHeading = rrData.getYawLocalization(limeLightVision.getAlliance());
+                double currentHeading = rrData.getYaw360();
 
-                rotX *= 1.1;
+                //telemetry.addData("Desired Heading: ", desiredHeading);
+                //telemetry.addData("Current Heading: ", currentHeading);
 
-                double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(z), 1);
-                double frontLeftPower = (rotY + rotX + z) / denominator;
-                double backLeftPower = (rotY - rotX + z) / denominator;
-                double frontRightPower = (rotY - rotX - z) / denominator;
-                double backRightPower = (rotY + rotX - z) / denominator;
+                lastErrorHeading = desiredHeading - currentHeading;
 
-                LFmotor.setPower(frontLeftPower);
-                LBmotor.setPower(backLeftPower);
-                RFmotor.setPower(frontRightPower);
-                RBmotor.setPower(backRightPower);
+                if (Math.abs(z) < 0.1) {
+
+                    z = lastErrorHeading * kPH;
+                    //telemetry.addData("Z Power: ", z);
+
+                    if (z > 0.5) z = 0.5;
+                    else if (z < -0.5) z = -0.5;
+
+                    //telemetry.addData("Z Power Reduction: ", z);
+
+                }
+                else{
+                    z *= -1;
+                }
+
+                rrData.getDrive().setDrivePowers(new PoseVelocity2d(
+                        new Vector2d(
+                                y,
+                                -x
+                        ),
+                        z
+                ));
             }
         }
-        public void omniDrive(Gamepad gamepad) {
-
-            double x = gamepad.left_stick_x;
-            double y = -gamepad.left_stick_y;
-            double z = gamepad.right_stick_x;
-
-            //Robot POV
-            if (robotCentric) {
-                x *= 1.1;
-
-                double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(z), 1);
-                double frontLeftPower = (y + x + z) / denominator;
-                double backLeftPower = (y - x + z) / denominator;
-                double frontRightPower = (y - x - z) / denominator;
-                double backRightPower = (y + x - z) / denominator;
-
-                LFmotor.setPower(frontLeftPower);
-                LBmotor.setPower(backLeftPower);
-                RFmotor.setPower(frontRightPower);
-                RBmotor.setPower(backRightPower);
-            }
-            //Field POV
-            else{
-                double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-
-                // Rotate the movement direction counter to the bot's rotation
-                double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
-                double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
-
-                rotX *= 1.1;
-
-                double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(z), 1);
-                double frontLeftPower = (rotY + rotX + z) / denominator;
-                double backLeftPower = (rotY - rotX + z) / denominator;
-                double frontRightPower = (rotY - rotX - z) / denominator;
-                double backRightPower = (rotY + rotX - z) / denominator;
-
-                LFmotor.setPower(frontLeftPower);
-                LBmotor.setPower(backLeftPower);
-                RFmotor.setPower(frontRightPower);
-                RBmotor.setPower(backRightPower);
-            }
+        public void killAllWheels(){
+            LFmotor.setPower(0);
+            LBmotor.setPower(0);
+            RFmotor.setPower(0);
+            RBmotor.setPower(0);
         }
 
         /** Gamepad */
         public void setGamepad(Gamepad driver) {
             this.driver = driver;
         }
+        public Gamepad getGampad(){
+            return driver;
+        }
 
         /** Final Updates */
         public void updateModeColor(){
             if (currentMode.equals(RobotConstantsV2.mainModes[0])){
-                driver.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
+
+                if (!turret.isAutoSetPosActive()){
+                    driver.setLedColor(1,1,0,Gamepad.LED_DURATION_CONTINUOUS);
+                }
+
+                else{
+                    if (turret.isFarToggled()){
+                        driver.setLedColor( 0, 1, 0, Gamepad.LED_DURATION_CONTINUOUS);
+                    }
+                    else{
+                        driver.setLedColor( 0, 1, 0.35, Gamepad.LED_DURATION_CONTINUOUS);
+                    }
+                }
             }
             else if (currentMode.equals(RobotConstantsV2.mainModes[1])){
-                //Differentiate these two
                 if (turret.isFarToggled()){
                     driver.setLedColor( 0, 0, 1, Gamepad.LED_DURATION_CONTINUOUS);
                 }
                 else{
-                    driver.setLedColor( 0, 1, 1, Gamepad.LED_DURATION_CONTINUOUS);
+                    driver.setLedColor( 0, 0.35, 1, Gamepad.LED_DURATION_CONTINUOUS);
                 }
             }
             else{
@@ -675,10 +671,6 @@ public class RobotDataV2 {
     public class PIDControl{
 
         /** PID For Shooter*/
-        private double kP = 0.007;
-        private double kI = 0.0000015;
-        private double kD = 0.000003;
-        private double kF = 0.00045;
         private ElapsedTime PIDTimer = new ElapsedTime();
         private double integralSum = 0;
         private double lastError = 0;
@@ -695,7 +687,7 @@ public class RobotDataV2 {
 
         /** Get Constants for Shooter */
         public String getPIDCos(){
-            return String.format("kP: %f, kI: %f, kD: %f, kF: %f", RobotConstantsV2.kPC, RobotConstantsV2.kIC, RobotConstantsV2.kDC, kF);
+            return String.format("kP: %f, kI: %f, kD: %f", RobotConstantsV2.kPC, RobotConstantsV2.kIC, RobotConstantsV2.kDC);
         }
 
         /** PID */
@@ -715,11 +707,10 @@ public class RobotDataV2 {
 
             PIDTimer.reset();
 
-            output = (error * kP) + (derivate * kD) + (integralSum * kI) + (desired * kF);
+            output = (error * RobotConstantsV2.kP) + (derivate * RobotConstantsV2.kD) + (integralSum * RobotConstantsV2.kI) + (desired * RobotConstantsV2.kF);
 
             return output;
         }
-
         public double PIDCarosel(double current, double desired) {
 
             double currentTimeC = PIDTimer.seconds();
@@ -766,7 +757,8 @@ public class RobotDataV2 {
     public class Turret extends PIDControl{
 
         /** Parts */
-        public DcMotorEx shooterMotor;
+        public DcMotorEx shooterMotorOne;
+        public DcMotorEx shooterMotorTwo;
         private Servo shooterServo;
 
         /** Physics Parameters */
@@ -783,6 +775,7 @@ public class RobotDataV2 {
 
         /** Toggle Turret */
         private boolean toggleTurretAim;
+        private boolean autoSetPosActive;
         private boolean isFar;
 
         //----------------------------------------
@@ -791,16 +784,22 @@ public class RobotDataV2 {
         private Turret(){
 
             /** Hardware Init */
-            shooterMotor = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotor");
+            shooterMotorOne = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotorOne");
+            shooterMotorTwo = (DcMotorEx)hardwareMap.get(DcMotor.class,"shooterMotorTwo");
             shooterServo = hardwareMap.get(Servo.class,"shooterServo");
 
-            shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-            shooterMotor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
-            shooterMotor.setDirection(DcMotor.Direction.REVERSE);
+            //shooterMotorOne.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            shooterMotorOne.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+            shooterMotorOne.setDirection(DcMotor.Direction.REVERSE);
+
+            //shooterMotorTwo.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            shooterMotorTwo.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+            shooterMotorTwo.setDirection(DcMotor.Direction.FORWARD);
 
             /** Mode Init */
             toggleTurretAim = false;
             isFar = false;
+            autoSetPosActive = false;
         }
 
         //----------------------------------------
@@ -856,8 +855,18 @@ public class RobotDataV2 {
 
             return TPSfound;
         }
+        private double getCurrentLinearVelocity(){
+            return shooterMotorOne.getVelocity() * ((2 * Math.PI) / w) * shooterWheelRadius;
+        }
 
         /** Turret Modes */
+        public void switchAutoSetPos(){
+            if (autoSetPosActive) autoSetPosActive = false;
+            else autoSetPosActive = true;
+        }
+        public boolean isAutoSetPosActive(){
+            return autoSetPosActive;
+        }
         public void switchTurretMode(){
             if (toggleTurretAim) toggleTurretAim = false;
             else toggleTurretAim = true;
@@ -879,25 +888,33 @@ public class RobotDataV2 {
         /** Human Player Intake Mode */
         public void activateHumanIntakeMode(){
             shooterServo.setPosition(RobotConstantsV2.MIN_HOOD_ANGLE_POS);
-            shooterMotor.setDirection(DcMotorEx.Direction.FORWARD);
+            shooterMotorOne.setDirection(DcMotorEx.Direction.FORWARD);
+            shooterMotorTwo.setDirection(DcMotorEx.Direction.REVERSE);
             powerShooterMotor(RobotConstantsV2.HUMAN_INTAKE_SPEED);
         }
         public void deactivateHumanIntakeMode(){
-            shooterMotor.setDirection(DcMotorEx.Direction.REVERSE);
+            shooterMotorOne.setDirection(DcMotorEx.Direction.REVERSE);
+            shooterMotorTwo.setDirection(DcMotorEx.Direction.FORWARD);
         }
 
         /** Shooter Power */
         public void powerShooterMotor(double TPS){
-            double current = shooterMotor.getVelocity();
+
+            if (TPS > RobotConstantsV2.MAX_TURRET_TPS) TPS = RobotConstantsV2.MAX_TURRET_TPS;
+
+            double current = shooterMotorOne.getVelocity();
             //shooterMotor.setVelocity(PIDShooter(current,TPS));
-            shooterMotor.setPower(PIDShooter(current,TPS));
+            double motorPower = PIDShooter(current,TPS);
+            shooterMotorOne.setPower(motorPower);
+            shooterMotorTwo.setPower(motorPower);
             //telemetry.addData("TPS NOW", TPS);
             //telemetry.addData("TPS Current: ", current);
 
         }
         public void killShooter(){
             //shooterMotor.setVelocity(RobotConstantsV2.KILL_SHOOTER_SPEED);
-            shooterMotor.setPower(0);
+            shooterMotorOne.setPower(0);
+            shooterMotorTwo.setPower(0);
         }
 
         /** Hood */
@@ -907,21 +924,41 @@ public class RobotDataV2 {
             if (angle > RobotConstantsV2.MAX_HOOD_ANGLE) return RobotConstantsV2.MAX_HOOD_ANGLE_POS;
             else if (angle < RobotConstantsV2.MIN_HOOD_ANGLE) return RobotConstantsV2.MIN_HOOD_ANGLE_POS;
 
-            return (double) Math.round((0.033358 * angle - 1.41127) * 1000) / 1000;
+            //Failsafe
+
+            //(double) Math.round((0.00777202 * angle + 0.351295) * 1000) / 1000
+            double pos = (double) Math.round((0.00518135 * angle + 0.484197) * 1000) / 1000;
+
+            if (pos < RobotConstantsV2.MIN_HOOD_ANGLE_POS) pos = RobotConstantsV2.MIN_HOOD_ANGLE_POS;
+            else if (pos > RobotConstantsV2.MAX_HOOD_ANGLE_POS) pos = RobotConstantsV2.MAX_HOOD_ANGLE_POS;;
+
+            return pos;
         }
-        public void angleRobot(double disp){
-            double desiredAngle = getAngleTotal(disp) + RobotConstantsV2.ANGLE_BONUS;
+        public void angleRobot(){
+
+            double vY = getVy();
+            double lV = getCurrentLinearVelocity()/RobotConstantsV2.dragMultiplier;
+
+            double desiredAngle = 0;
+
+            if (lV >= vY){
+                desiredAngle = Math.toDegrees(Math.asin(vY * RobotConstantsV2.VERTICAL_MULTIPLIER/lV));
+            }
+
+            //telemetry.addData("Angle Now: ", desiredAngle);
+
+            //double desiredAngle = getAngleTotal(disp) + RobotConstantsV2.ANGLE_BONUS;
             shooterServo.setPosition(convertDegToServo(desiredAngle));
         }
 
         /** Final Shot */
         public void aimBall(double disp){
-            angleRobot(disp);
+            angleRobot();
             double TPS = getTPS(disp);
             powerShooterMotor(TPS);
         }
         public void aimBall(double disp, double TPS){
-                angleRobot(disp);
+                angleRobot();
                 powerShooterMotor(TPS);
         }
 
@@ -954,11 +991,27 @@ public class RobotDataV2 {
 
             telemetry.addLine("Turret: ");
 
-            telemetry.addData("Current Shooter Motor TPS: ", shooterMotor.getVelocity());
+            telemetry.addData("Current Shooter Motor TPS One: ", shooterMotorOne.getVelocity());
+            telemetry.addData("Current Shooter Motor TPS Two: ", shooterMotorTwo.getVelocity());
+
             telemetry.addData("Desired TPS: ", getTPS(disp));
             telemetry.addData("TPS Error:", getTPSError(disp));
             telemetry.addData("Displacement (m): ", disp);
             telemetry.addData("Angle: ", getAngleTotal(disp));
+
+        }
+        /** Tune PID Data*/
+
+        public void telemetryPID(double disp){
+
+            telemetry.addData("PID ADJUSTED 1: ", PIDShooter(shooterMotorOne.getVelocity(), getTPS(disp)));
+            telemetry.addData("PID ADJUSTED 2 (COSMETIC BOTH USING 1): ", PIDShooter(shooterMotorTwo.getVelocity(), getTPS(disp)));
+            telemetry.addData("PID Co: ", getPIDCos());
+            telemetry.addData("True TPS 1: ", shooterMotorOne.getVelocity());
+            telemetry.addData("True TPS 2: ", shooterMotorTwo.getVelocity());
+            telemetry.addData("Desired Ticks Per Second: ", getTPS(disp));
+            telemetry.addData("TPS Error:", shooterMotorOne.getVelocity() - getTPS(disp));
+            telemetry.addData("TPS Error:", shooterMotorTwo.getVelocity() - getTPS(disp));
 
         }
         public void telemetryTurretBasic(){
@@ -966,13 +1019,18 @@ public class RobotDataV2 {
             telemetry.addData("Far Shot: ", !isFar);
         }
         public double getTPSError(double disp){
-            return shooterMotor.getVelocity() - getTPS(disp);
+            return shooterMotorOne.getVelocity() - getTPS(disp);
         }
         public double getTPSErrorManual(double TPS){
-            return shooterMotor.getVelocity() - TPS;
+            return shooterMotorOne.getVelocity() - TPS;
         }
         public boolean isUpToSpeed(double distance){
             //Current error less than allowed error
+//            telemetry.addData("TPS Error: ", getTPSError(distance));
+//            telemetry.addData("TPS: ", getTurret().getTPS(distance));
+//            telemetry.addData("Current TPS: ", shooterMotor.getVelocity());
+
+            //TODO: TPS Both
             return Math.abs(getTPSError(distance)) < getTurret().getTPS(distance) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD;
         }
     }
@@ -1004,7 +1062,6 @@ public class RobotDataV2 {
         private String[] inventory;
         private String[] pattern;
         private int currentCycle;
-
 
         /** Intake  */
         private boolean intakeMotorOn;
@@ -1138,10 +1195,12 @@ public class RobotDataV2 {
         public void switchIntake(){
             intakeMotor.setDirection(DcMotorEx.Direction.REVERSE);
             if (!intakeMotorOn){
+                getDriveTrain().getGampad().rumble(1,0,1);
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_ON);
                 intakeMotorOn = true;
             }
             else{
+                getDriveTrain().getGampad().rumble(0,1,1);
                 intakeMotor.setVelocity(RobotConstantsV2.INTAKE_OFF);
                 intakeMotorOn = false;
             }
@@ -1375,7 +1434,7 @@ public class RobotDataV2 {
             //Won't override updates
             //TODO remove transfer in prog if its buggy
             //inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple") ||
-            if (!isCaroselInPlace()){
+            if (!isCaroselInPlace() || inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
                 return;
             }
 
@@ -1383,10 +1442,19 @@ public class RobotDataV2 {
                 inventory[currentCycle] = getColorFront();
             }
 
-            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
-                if (getColorBack().equals("Empty")) return;
+            if (inventory[currentCycle].equals("Empty")){
                 inventory[currentCycle] = getColorBack();
             }
+
+
+//            if (inventory[currentCycle].equals("Empty")){
+//                inventory[currentCycle] = getColorFront();
+//            }
+//
+//            if (inventory[currentCycle].equals("Green") || inventory[currentCycle].equals("Purple")){
+//                if (getColorBack().equals("Empty")) return;
+//                inventory[currentCycle] = getColorBack();
+//            }
 
             //inventory[currentCycle] = getColorFront();
 
@@ -1437,8 +1505,8 @@ public class RobotDataV2 {
         public void autoIntakeCycle(){
             //telemetry.addData("Next Empty Spot: ", getEmptySpot());
             updateCaroselEncoder();
+            updateInventory();
             if (!autoIntakeCooldownActive && !transferCooldownActive && detectedArtifact() && isCaroselInPlace() && isEmptySpot()){
-                updateInventory();
                 autoIntakeCooldownActive = true;
                 autoIntakeCoolDown.reset();
             }
@@ -1451,7 +1519,8 @@ public class RobotDataV2 {
                 autoIntakeCooldownActive = false;
 
                 if (inventory[currentCycle].equals("Empty") && detectedArtifact()){
-                    inventory[currentCycle] = "Purple"; //Failsafe
+                    inventory[currentCycle] = getColorBack();
+                    if (inventory[currentCycle].equals("Empty")) inventory[currentCycle] = "Purple"; //Failsafe
                 }
 
 
@@ -1552,11 +1621,6 @@ public class RobotDataV2 {
 
         public void updateCaroselEncoder(){ //TODO Temp
             globalCaroselPosition = caroselAnalog.getVoltage() * RobotConstantsV2.encoderRes;
-        }
-
-        public void resetCaroselGlobalIncrement(){
-            //TODO Find a way to zero it
-            RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
         }
         public int getCycleIncrement(int desiredCycle){ //Used for cycle based carosel differences for movement
 
@@ -1664,15 +1728,12 @@ public class RobotDataV2 {
 
             return (getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_MIN_THRESHOLD && getRangerDistance() < RobotConstantsV2.RANGER_DETECTION_MAX_THRESHOLD);
         }
-
         public boolean isShotConfirmed(){
 
             if (!isCaroselInPlace()) return false;
 
             return getRangerDistance() > RobotConstantsV2.RANGER_DETECTION_CONFIRM_SHOT;
         }
-
-
         public String getColorBack() { //TODO here issue with megging
 //            if (detectedArtifactBack()) {
 //                float[] HSV = getHSVBack();
@@ -1690,11 +1751,10 @@ public class RobotDataV2 {
             //&& HSV[2] >= RobotConstantsV2.MIN_V
             if (detectedArtifactBack()){
                 if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Green";}
-                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Purple";}
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIN_S){return "Purple";}
             }
             return "Empty";
         }
-
         public boolean detectedArtifactFront(){
             return colorSensorFrontDist.getDistance(DistanceUnit.CM) < RobotConstantsV2.COLOR_SENSOR_DIST_THRESHOLD_FRONT && isCaroselInPlace();
 
@@ -1709,30 +1769,21 @@ public class RobotDataV2 {
         }
         public String getColorFront(){
 
-            //TODO old method
-
-//            if (detectedArtifactFront()) {
-//                float[] HSV = getHSVFront();
-//
-//                if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){
-//                    return "Green";
-//                }
-//
-//                else{
-//                    return "Purple";
-//                }
-//            }
-
             float[] HSV = getHSVFront();
 
             if (detectedArtifactFront()){
                 if (HSV[0] < RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Green";}
-                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] >= RobotConstantsV2.MIN_S){return "Purple";}
+                else if (HSV[0] >= RobotConstantsV2.MIDDLE_H && HSV[1] < RobotConstantsV2.MIN_S){return "Purple";}
             }
 
             return "Empty";
         }
-
+        public void killColorSensors(){
+            colorSensorBack.close();
+            colorSensorFront.close();
+            colorSensorBackDist.close();
+            colorSensorFrontDist.close();
+        }
 
         /** Indicator Lights */
         public void indicatorsInInit(){
@@ -1744,52 +1795,9 @@ public class RobotDataV2 {
             switch (mode){
                 case("auto"):
 
-//                    if (!limelight.getResults().isValid()){
-//                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
-//                    }
-
-                    disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
-//                    if (!limelight.canSeeSomeAT() || !turret.isToggleTurretAim() || Math.abs(turret.getTPSError(disp)) > turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD){
-//                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
-//                    }
-                    if (!turret.isToggleTurretAim() || !getTurret().isUpToSpeed(disp)){
-                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
-                    }
-                    else{
-                        indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
-                    }
-
-                    //Current Color
-
-                    if (inventory[currentCycle].equals("Purple")){
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
-                    }
-                    else if (inventory[currentCycle].equals("Green")){
-                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
-                    }
-                    else{
-                        if (getColorBack().equals("Purple")){
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
-                        }
-                        else if (getColorBack().equals("Green")){
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
-                        }
-                        else{
-                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
-                        }
-                    }
-
-                    break;
-
-                case("manual"):
-
-                    if (turret.isFarToggled()){
-//                        telemetry.addData("Distance: ", disp);
-//                        telemetry.addData("Stupid TPS Error: ", turret.getTPSError(disp));
-//                        telemetry.addData("Attempted TPS: ", turret.getTPS(disp));
-//                        telemetry.addData("Threshold Max: ", turret.getTPS(disp) * RobotConstantsV2.SHOOTER_SPEED_THRESHOLD);
-
-                        if (!getTurret().isUpToSpeed(disp)){
+                    //Auto Aim On
+                    if (!turret.isAutoSetPosActive()){
+                        if (!turret.isToggleTurretAim() || !getTurret().isUpToSpeed(disp)){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
                         else{
@@ -1797,9 +1805,59 @@ public class RobotDataV2 {
                         }
                     }
                     else{
-                        disp = RobotConstantsV2.CLOSE_BALL_DISTANCE;
+                        if (turret.isFarToggled()){
+                            if (!turret.isToggleTurretAim() || !getTurret().isUpToSpeed(RobotConstantsV2.FAR_BALL_DISTANCE)){
+                                indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                            }
+                            else{
+                                indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                            }
+                        }
+                        else{
+                            if (!turret.isToggleTurretAim() || !getTurret().isUpToSpeed(RobotConstantsV2.CLOSE_BALL_DISTANCE)){
+                                indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                            }
+                            else{
+                                indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                            }
+                        }
+                    }
 
-                        if (!getTurret().isUpToSpeed(disp)){
+                    //Current Color
+                    if (inventory[currentCycle].equals("Purple")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+                    }
+                    else if (inventory[currentCycle].equals("Green")){
+                        indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+                    }
+                    else{
+//                        if (getColorBack().equals("Purple")){
+//                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_PURPLE);
+//                        }
+//                        else if (getColorBack().equals("Green")){
+//                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_GREEN);
+//                        }
+//                        else{
+                            indicatorTwo.setPosition(RobotConstantsV2.INDICATOR_YELLOW);
+                        //}
+                    }
+
+                    break;
+
+                case("manual"):
+
+                    //Shooter Speed
+                    if (turret.isFarToggled()){
+
+                        if (!getTurret().isUpToSpeed(RobotConstantsV2.FAR_BALL_DISTANCE)){
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
+                        }
+                        else{
+                            indicatorOne.setPosition(RobotConstantsV2.INDICATOR_BLUE);
+                        }
+                    }
+                    else{
+                        if (!getTurret().isUpToSpeed(RobotConstantsV2.CLOSE_BALL_DISTANCE)){
                             indicatorOne.setPosition(RobotConstantsV2.INDICATOR_RED);
                         }
                         else{
@@ -1855,17 +1913,17 @@ public class RobotDataV2 {
             //telemetry.addData("Ranger Dist: ", getRangerDistance());
             //telemetry.addData("Analog Ranger:", rangerSensor.getVoltage());
             telemetry.addLine(String.format("Inventory: (%s, %s, %s)", inventory[0], inventory[1], inventory[2]));
-            telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern[0], pattern[1], pattern[2]));
+            telemetry.addLine(String.format("Motif: (%s, %s, %s)", pattern [0], pattern[1], pattern[2]));
 //            float[] HSVFront = getHSVFront();
 //            telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
 //            float[] HSVBack = getHSVBack();
 //            telemetry.addLine(String.format("HSV Back: (%.5f, %.5f, %.5f)", HSVBack[0], HSVBack[1], HSVBack[2]));
 
             telemetry.addData("Current Cycle: ", currentCycle);
-//            telemetry.addData("Distance Front: ", colorSensorFrontDist.getDistance(DistanceUnit.CM));
-//            telemetry.addData("Color Front: ", getColorFront());
-//            telemetry.addData("Distance Back: ", colorSensorBackDist.getDistance(DistanceUnit.CM));
-//            telemetry.addData("Color Back: ", getColorBack());
+            //telemetry.addData("Distance Front: ", colorSensorFrontDist.getDistance(DistanceUnit.CM));
+            //telemetry.addData("Color Front: ", getColorFront());
+            //telemetry.addData("Distance Back: ", colorSensorBackDist.getDistance(DistanceUnit.CM));
+            //telemetry.addData("Color Back: ", getColorBack());
             //telemetry.addData("IN Place: ", isCaroselInPlace());
 //            telemetry.addData("Detected Back: ", detectedArtifactBack());
 ////            telemetry.addData("Detected Front: ", detectedArtifactFront());
@@ -1873,7 +1931,7 @@ public class RobotDataV2 {
 //            telemetry.addData("Global Position: ", globalCaroselPosition);
 //            telemetry.addData("Inventory Current: ", inventory[currentCycle]);
             telemetry.addData("Has Pattern in Inventory: ", hasPattern());
-//            telemetry.addData("Voltage: ", caroselAnalog.getVoltage());
+            //telemetry.addData("Voltage: ", caroselAnalog.getVoltage());
 
             telemetry.addLine("\n------------------------------------\n");
         }

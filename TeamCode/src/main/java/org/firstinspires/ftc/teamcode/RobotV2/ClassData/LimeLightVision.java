@@ -2,11 +2,16 @@ package org.firstinspires.ftc.teamcode.RobotV2.ClassData;
 
 import android.util.Size;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.limelightvision.LLFieldMap;
+
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.robot.Robot;
 import com.sun.tools.javac.jvm.Gen;
 
 import org.firstinspires.ftc.robotcontroller.external.samples.SensorGoBildaPinpoint;
@@ -14,7 +19,9 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.teamcode.Drawing;
 import org.firstinspires.ftc.teamcode.GoBildaPinpointDriver;
 import org.firstinspires.ftc.teamcode.Localizer;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
@@ -32,7 +39,6 @@ public class LimeLightVision {
 
     /** Hardware */
     private Limelight3A limelight;
-    private PinpointLocalizer localizer; //TODO this localizer needs to be updated more often
 
     /** Variables */
     private double atHeight; //Meters
@@ -107,10 +113,6 @@ public class LimeLightVision {
     //----------------------------------------
 
     /** Limelight Object */
-    public void setLimelightLocalizier(PinpointLocalizer localizer){
-        activatedLocalizer = true;
-        this.localizer = localizer;
-    }
     public void initLimeLight(){
         limelight.start();
     }
@@ -119,6 +121,9 @@ public class LimeLightVision {
     }
 
     /** April Tags */
+    public boolean canSeeSomeAT(){
+        return getResults().isValid() && getResults() != null;
+    }
     public LLResult getResults(){
         return limelight.getLatestResult();
     }
@@ -146,18 +151,6 @@ public class LimeLightVision {
 
         return 0;
     }
-    public Pose2d getCurrentPosLimelight(){
-        if (getResults().isValid() && getResults() != null){
-            return new Pose2d(0,0,0); //TODO emergency
-        }
-
-        //TODO upload field to file
-        return new Pose2d(getResults().getBotpose().getPosition().x,getResults().getBotpose().getPosition().y, localizer.getHeadingLocalizerDegrees());
-
-    }
-    public double getYaw(){ //TODO might not be the same as april tag library pipline
-        return localizer.getHeadingLocalizerDegrees();
-    }
     public double getFidYaw(){
         if (canSeeSomeAT()){
             List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
@@ -173,13 +166,22 @@ public class LimeLightVision {
         return 0;
     }
     public double getDisp(){
-        if (getResults().isValid() && getResults() != null){
+        if (canSeeSomeAT()){
             return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()+10))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
         }
         return 0;
     }
-    public boolean canSeeSomeAT(){
-        return getResults().isValid() && getResults() != null;
+
+
+    /** Localiation */
+
+    //Updates
+    public void updateOrientationIMU(double yaw){
+        limelight.updateRobotOrientation(yaw); //getYaw()
+    }
+    public void updateGlobalPosMetaTag(){
+        Pose3D pos = getResults().getBotpose_MT2();
+        RobotConstantsV2.LAST_ROBOT_POS = new Pose2d(39.37 * pos.getPosition().x,39.37 * pos.getPosition().y, pos.getOrientation().getYaw(AngleUnit.RADIANS));
     }
 
     /** Last Updates */
@@ -190,9 +192,6 @@ public class LimeLightVision {
             //telemetry.addData("Disp: ", getDisp());
             telemetry.addData("Motif: ", motifCode);
         }
-    }
-    public void updateOrientationIMU(){
-        if(activatedLocalizer) limelight.updateRobotOrientation(getYaw());
     }
     public void updateAtHeight(double heightOfLauncher){
         atHeight -= heightOfLauncher;
@@ -251,7 +250,6 @@ public class LimeLightVision {
         if (this.alliance.equals("blue")) limelight.pipelineSwitch(0);
         else limelight.pipelineSwitch(1);
     }
-
     public void switchAlliance(){
         if (alliance.equals("blue")){
             alliance = "red";
@@ -264,12 +262,10 @@ public class LimeLightVision {
             limelight.pipelineSwitch(0);
         }
     }
-
     public void forceAllianceRed(){
         alliance = "red";
         limelight.pipelineSwitch(1);
     }
-
     public void forceAllianceBlue(){
         alliance = "blue";
         limelight.pipelineSwitch(0);

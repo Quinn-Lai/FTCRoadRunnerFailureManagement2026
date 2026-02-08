@@ -34,6 +34,8 @@ public class AutoGate extends OpMode {
     @Override
     public void init(){
 
+        RoadRunnerDataV2.isAutoPosStored = false; //TODO rememeber
+        RobotConstantsV2.CAROSEL_TOLERANCE = RobotConstantsV2.CAROSEL_TOLERANCE_AUTO;
         RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
         RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO; //Transfer Shot
         RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
@@ -47,7 +49,6 @@ public class AutoGate extends OpMode {
         limeLight.initLimeLight();
 
         LimeLightVision.isFoundMotif = false;
-        RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
         RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         rrData.getRobotData().getCarosel().forceTransferDown();
@@ -66,7 +67,7 @@ public class AutoGate extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU();
+        limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -135,7 +136,7 @@ public class AutoGate extends OpMode {
                             .splineToLinearHeading(lineTopCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_BLUE, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_BLUE, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
                     TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_BLUE)
                             .setTangent(Math.toRadians(90))
@@ -147,7 +148,7 @@ public class AutoGate extends OpMode {
 
                     TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED_SLOWER));
 
                     TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
                             .setTangent(Math.toRadians(90))
@@ -162,8 +163,13 @@ public class AutoGate extends OpMode {
                             .splineToLinearHeading(lineBotCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
                     TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineBotCollect)
-                            .setTangent(Math.toRadians(135))
+                            .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(RobotConstantsV2.OFF_LINE_BLUE_SHOOT_CLOSE,Math.toRadians(135), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder parkGate = rrData.getDrive().actionBuilder(RobotConstantsV2.OFF_LINE_BLUE_SHOOT_CLOSE)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.PARK_GATE_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -176,7 +182,8 @@ public class AutoGate extends OpMode {
                             shootThird,
                             bottomLinePrep,
                             bottomLineCollect,
-                            shootFourth
+                            shootFourth,
+                            parkGate
                     });
                 }
 
@@ -222,7 +229,7 @@ public class AutoGate extends OpMode {
                             .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_RED, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_RED, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
                     TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_RED)
                             .setTangent(Math.toRadians(270))
@@ -234,7 +241,7 @@ public class AutoGate extends OpMode {
 
                     TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED_SLOWER));
 
                     TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(lineMidCollect)
                             .setTangent(Math.toRadians(270))
@@ -249,8 +256,13 @@ public class AutoGate extends OpMode {
                             .splineToLinearHeading(lineBotCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
                     TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineBotCollect)
-                            .setTangent(Math.toRadians(225))
+                            .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(RobotConstantsV2.OFF_LINE_RED_SHOOT_CLOSE,Math.toRadians(225), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder parkGate = rrData.getDrive().actionBuilder(RobotConstantsV2.OFF_LINE_RED_SHOOT_CLOSE)
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.PARK_GATE_RED,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -263,11 +275,12 @@ public class AutoGate extends OpMode {
                             shootThird,
                             bottomLinePrep,
                             bottomLineCollect,
-                            shootFourth
+                            shootFourth,
+                            parkGate
                     });
                 }
 
-                limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 
@@ -300,6 +313,7 @@ public class AutoGate extends OpMode {
             LimeLightVision.failsafeMotif();
         }
 
+        rrData.getRobotData().getTurret().switchAutoSetPos();
         rrData.getRobotData().getTurret().toggleTurretFar(false);
 
 
@@ -314,7 +328,7 @@ public class AutoGate extends OpMode {
                 ),
                 rrData.intakeOff(),
                 rrData.forceFeedInventory(forceFeedActive, "Purple","Purple", "Green"),
-                rrData.cycleQuickSlot(patternEnabled)
+                rrData.cycleQuickSlot(false)
         );
 
         SequentialAction shootFirstLine = new SequentialAction(
@@ -322,8 +336,8 @@ public class AutoGate extends OpMode {
                 rrData.getTrajectory(4),
                 rrData.intakeOff(),
                 rrData.waitForTurret(isWaitTurret),
-                rrData.requestArtifactShots(patternEnabled),
-                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.requestArtifactShots(false),
+                rrData.shootArtifacts(rrData.getDisplacement(), false),
                 rrData.forceTransferDown()
         );
 
@@ -429,13 +443,14 @@ public class AutoGate extends OpMode {
                                 buildBear[4],
                                 buildBear[5],
 
-                                rrData.setLooping(false)
-                        )
+                                rrData.setLooping(false),
+
+                                rrData.killTurret(),
+                                rrData.getTrajectory(11),
+                                rrData.killTurret()
+                                )
                 )
         );
-
-        //TODO op mode stop after if abort
-
     }
 
     @Override
@@ -446,9 +461,10 @@ public class AutoGate extends OpMode {
     @Override
     public void stop() {
 
-        rrData.setLooping(false);
+        RoadRunnerDataV2.isAutoPosStored = true; //TODO rememeber
+        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
 
-        //RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
+        rrData.setLooping(false);
 
         telemetry.addLine("Autonomous Completed!");
         telemetry.update();

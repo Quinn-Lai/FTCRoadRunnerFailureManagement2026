@@ -60,7 +60,7 @@ public class AutoTemplate extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU();
+        limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingSide()){
@@ -419,7 +419,7 @@ public class AutoTemplate extends OpMode {
                     }
                 }
 
-                limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 

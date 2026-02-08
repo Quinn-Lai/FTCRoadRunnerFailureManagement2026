@@ -416,13 +416,14 @@ public final class MecanumDrive {
 
 
             //&& error.position.norm() < RobotConstantsV2.PARKING_TOLERENCE
-            if (t >= timeTrajectory.duration & error.heading.toDouble() < Math.toRadians(RobotConstantsV2.ANGLE_TOLERENCE_AUTO)) {
+
+            if (error.position.norm() < RobotConstantsV2.PARKING_TOLERENCE){
                 leftFront.setPower(0);
                 leftBack.setPower(0);
                 rightBack.setPower(0);
                 rightFront.setPower(0);
 
-                return false;
+                //return false;
             }
 
 

@@ -64,7 +64,7 @@ public class AutoExtraAlignCorrect extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU();
+        limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -264,7 +264,7 @@ public class AutoExtraAlignCorrect extends OpMode {
                     });
                 }
 
-                limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 

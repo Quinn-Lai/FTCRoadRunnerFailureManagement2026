@@ -64,7 +64,7 @@ public class AutoAlign extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU();
+        limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -265,7 +265,7 @@ public class AutoAlign extends OpMode {
 
                 }
 
-                limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
+                //limeLight.setLimelightLocalizier(rrData.getDrive().getLocalizerPinpoint());
                 rrData.getRobotData().getCarosel().indicatorsInInit();
             }
 
@@ -419,6 +419,7 @@ public class AutoAlign extends OpMode {
                                 buildBear[4],
                                 buildBear[5],
 
+                                rrData.killTurret(),
                                 rrData.setLooping(false)
                         )
                 )

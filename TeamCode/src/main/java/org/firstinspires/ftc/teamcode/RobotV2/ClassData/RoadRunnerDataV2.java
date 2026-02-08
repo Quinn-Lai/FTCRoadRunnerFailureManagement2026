@@ -7,7 +7,6 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.InstantAction;
 import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -43,9 +42,10 @@ public class RoadRunnerDataV2{
     //TeleOp
     private List<Action> teleOpActions;
     public static Pose2d lastAutoPosition = null;
-    private boolean notAutoPositionStored;
+    public static boolean isAutoPosStored = false;
     private Action currentTeleOpAction;
     private boolean teleOpActionActive;
+    private boolean isCaseOhActive;
 
     //----------------------------------------
     public RoadRunnerDataV2(RobotDataV2 robot){
@@ -58,21 +58,18 @@ public class RoadRunnerDataV2{
         teleOpActions = new ArrayList<>();
         trajectoryBuilt = new ArrayList<Action>();
         beginPose = null;
-        notAutoPositionStored = false;
 
         failsafeTimer = new ElapsedTime();
 
         currentTeleOpAction = null;
         displacement = 0;
         intendedHeading = 0;
+        isCaseOhActive = false;
+
+        setBeginPoseFromAuto();
     }
 
     //----------------------------------------
-
-    /** Trajectories Init */
-    public boolean isLoopingActive(){
-        return loopingActive;
-    }
 
     /** Localization */
     public Pose2d getBeginPose() {
@@ -93,6 +90,9 @@ public class RoadRunnerDataV2{
             drive = new MecanumDrive(robotData.getHardwareMap(), new Pose2d(0,0,0));
         }
     }
+    public void updateDrivePos(Pose2d update){
+        drive.localizer.setPose(update);
+    }
     public void createDashboard(){
         dash = FtcDashboard.getInstance();
     }
@@ -100,20 +100,94 @@ public class RoadRunnerDataV2{
         return dash;
     }
 
+    //Global Yaw
+    public double getYaw(){
+        //return drive.getLocalizerPinpoint().getHeadingLocalizerDegrees();
+        return Math.toDegrees(drive.localizer.getPose().heading.toDouble());
+    }
+    public double getYawRad(){
+        return drive.localizer.getPose().heading.toDouble();
+    }
+    public double getYaw360(){
+        return (getYaw() + 360) % 360;
+    }
+
+    //Localization (From Goal)
+    public double getDispLocalization(String alliance) {
+
+        if (alliance.equals("blue")) {
+            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, 2)));
+        }
+        else {
+            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_RED[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_RED[1] - drive.localizer.getPose().position.y, 2)));
+        }
+    }
+    public double getYawLocalization(String alliance){
+        double heading;
+
+        if (alliance.equals("blue")) {
+
+//            robotData.getTelemetry().addData("X: ",  drive.localizer.getPose().position.x);
+//            robotData.getTelemetry().addData("Y: ",  drive.localizer.getPose().position.y);
+//
+//            robotData.getTelemetry().addData("X Goal: ", RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] );
+//            robotData.getTelemetry().addData("Y Goal: ", RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] );
+//
+//            robotData.getTelemetry().addData("Pos: ", Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x)));
+
+            heading = Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x));
+        }
+        else {
+            heading = Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_RED[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_RED[0] - drive.localizer.getPose().position.x));
+        }
+
+        if (heading < 0) heading += 360;
+
+        return heading;
+    }
+    public void updateGlobalRobotPosition(LimeLightVision limelight){
+
+        if (limelight.canSeeSomeAT()){
+            limelight.updateGlobalPosMetaTag();
+            Pose2d pose = RobotConstantsV2.LAST_ROBOT_POS;
+            TelemetryPacket packet = new TelemetryPacket();
+            packet.fieldOverlay().setStroke("#3F51B5");
+            Drawing.drawRobot(packet.fieldOverlay(), pose);
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            updateDrivePos(pose);
+            drive.updatePoseEstimate();
+        }
+        else{
+            Pose2d pose = drive.localizer.getPose();
+            RobotConstantsV2.LAST_ROBOT_POS = pose;
+            TelemetryPacket packet = new TelemetryPacket();
+            packet.fieldOverlay().setStroke("#3F51B5");
+            Drawing.drawRobot(packet.fieldOverlay(), pose);
+            FtcDashboard.getInstance().sendTelemetryPacket(packet);
+            drive.updatePoseEstimate();
+        }
+    }
+
+    //Totality
+    public double getYawTotality(LimeLightVision limelight){
+        if (limelight.canSeeSomeAT()) return limelight.getFidYaw();
+        else return getYawLocalization(limelight.getAlliance());
+    }
+    public double getDispTotality(LimeLightVision limelight){
+        if (limelight.canSeeSomeAT()) return limelight.getDisp();
+        else return getDispLocalization(limelight.getAlliance());
+    }
 
     /** TeleOp */
     public void setBeginPoseFromAuto(){
-        if (lastAutoPosition != null){
-            notAutoPositionStored = false;
+        if (isAutoPosStored){
             beginPose = lastAutoPosition;
         }
         else{
-            beginPose = new Pose2d(0,0,0);
-            notAutoPositionStored = true;
+            beginPose = new Pose2d(0,0,0); //Failsafe
         }
-    }
-    public boolean getNotAutoPosStored(){
-        return notAutoPositionStored;
+
+        isAutoPosStored = false;
     }
     public void setCurrentTeleOpAction(Action a){
         currentTeleOpAction = a;
@@ -121,57 +195,6 @@ public class RoadRunnerDataV2{
     public void endTeleOpAction(){
         currentTeleOpAction = null;
     }
-    //TODO Attempted to run trajectory as just an action
-    public Action getParkingTrajectory(String alliance){
-
-        Action park;
-
-        if (alliance.equals("blue")){
-
-            park = getDrive().actionBuilder(RobotConstantsV2.blueCorner)
-                    .setTangent(Math.toRadians(225))
-                    .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
-                    .build();
-        }
-        else{
-            park = getDrive().actionBuilder(RobotConstantsV2.redCorner)
-                    .setTangent(Math.toRadians(135))
-                    .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
-                    .build();
-        }
-
-        return park;
-    }
-    public Action getAlignTrajectory(double limelightYaw){
-
-        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
-
-        Action align = getDrive().actionBuilder(new Pose2d(0,0,0))
-                .turn(Math.toRadians(-limelightYaw))
-                .build();
-
-        return align;
-
-    }
-
-    public Action getAlignTrajectoryAuto(double limelightYaw){
-
-        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
-
-        Action align = getDrive().actionBuilder(getDrive().localizer.getPose())
-                .turn(Math.toRadians(-limelightYaw))
-                .build();
-
-        return align;
-
-    }
-
-//    public Action updateCurrentTrajectory(int num){
-//
-//
-//        getTrajectoryPath().set(num,);
-//    }
-
     public void setTeleOpActionActive(boolean active){
         this.teleOpActionActive = active;
     }
@@ -198,35 +221,6 @@ public class RoadRunnerDataV2{
 
         dash.sendTelemetryPacket(packet);
 
-    }
-    public void requestPark(String alliance){
-
-        if (!teleOpActionActive){
-            teleOpActionActive = true;
-            killTeleOpActions();
-
-            if (alliance.equals("blue")){
-                setBeginPose(RobotConstantsV2.blueCorner);
-                createDrive();
-            }
-            else{
-                setBeginPose(RobotConstantsV2.redCorner);
-                createDrive();
-            }
-
-            addTeleopAction(getParkingTrajectory(alliance));
-        }
-    }
-    public void requestAlign(double yaw){
-
-        if (!teleOpActionActive){
-            teleOpActionActive = true;
-            killTeleOpActions();
-            setBeginPose(new Pose2d(0,0,0));
-            createDrive();
-            addTeleopAction(getAlignTrajectory(yaw));
-
-        }
     }
     public List<Action> getTeleOpActions(){
         return teleOpActions;
@@ -262,6 +256,126 @@ public class RoadRunnerDataV2{
     }
 
 
+    /** Trajectories */
+    public Action getParkingTrajectory(String alliance){
+
+        Action park;
+
+//        if (alliance.equals("blue")){
+//
+//            park = getDrive().actionBuilder(RobotConstantsV2.blueCorner)
+//                    .setTangent(Math.toRadians(225))
+//                    .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
+//                    .build();
+//        }
+//        else{
+//            park = getDrive().actionBuilder(RobotConstantsV2.redCorner)
+//                    .setTangent(Math.toRadians(135))
+//                    .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
+//                    .build();
+//        }
+
+        if (alliance.equals("blue")){
+
+            park = getDrive().actionBuilder(drive.localizer.getPose())
+                    //TODO Add Tangent Direction of path
+                    .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
+                    .build();
+        }
+        else{
+            park = getDrive().actionBuilder(drive.localizer.getPose())
+                    .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
+                    .build();
+        }
+
+        return park;
+    }
+    public Action getAlignTrajectory(double limelightYaw){
+
+        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
+
+        Action align = getDrive().actionBuilder(drive.localizer.getPose())
+                .turn(Math.toRadians(-limelightYaw))
+                .build();
+
+        return align;
+
+    }
+    public Action getAlignTrajectoryAuto(double limelightYaw){
+
+        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
+
+        Action align = getDrive().actionBuilder(getDrive().localizer.getPose())
+                .turn(Math.toRadians(-limelightYaw))
+                .build();
+
+        return align;
+
+    }
+    public Action getCaseOhStall(){
+
+        Action caseOh = getDrive().correctionActionBuilder(drive.localizer.getPose())
+                .splineToLinearHeading(new Pose2d(drive.localizer.getPose().position.x+0.01,drive.localizer.getPose().position.y,drive.localizer.getPose().heading.toDouble()), 0, new TranslationalVelConstraint(10))
+                .build();
+
+        return caseOh;
+
+    }
+    public boolean isCaseOhActive(){
+        return isCaseOhActive;
+    }
+
+    public void switchCaseOh(){
+        if (isCaseOhActive) isCaseOhActive = false;
+        else{
+            requestCaseOhStall();
+            isCaseOhActive = true;
+        }
+    }
+
+    public void forceStopCaseOh(){
+        isCaseOhActive = false;
+    }
+
+    public void forceOnCaseOh(){
+        requestCaseOhStall();
+        isCaseOhActive = true;
+    }
+
+    /** Trajectories Request*/
+    public void requestPark(String alliance){
+
+        robotData.getDriveTrain().killAllWheels();
+
+        if (!teleOpActionActive){
+            teleOpActionActive = true;
+            killTeleOpActions();
+            addTeleopAction(getParkingTrajectory(alliance));
+        }
+    }
+    public void requestAlign(double yaw){
+
+        robotData.getDriveTrain().killAllWheels();
+
+        if (!teleOpActionActive){
+            teleOpActionActive = true;
+            killTeleOpActions();
+            addTeleopAction(getAlignTrajectory(yaw));
+
+        }
+    }
+    public void requestCaseOhStall(){
+
+        robotData.getDriveTrain().killAllWheels();
+
+        if (!teleOpActionActive){
+            teleOpActionActive = true;
+            killTeleOpActions();
+            addTeleopAction(getCaseOhStall());
+        }
+    }
+
+
     /** Robot Parts */
     public RobotDataV2 getRobotData() {
         return robotData;
@@ -272,9 +386,11 @@ public class RoadRunnerDataV2{
     public void setLoopStatus(boolean active){
         this.loopingActive = active;
     }
+    public boolean isLoopingActive(){
+        return loopingActive;
+    }
 
     /** Trajectory Generation */
-
     public ArrayList<Action> getTrajectoryPath() {
         return trajectoryBuilt;
     }     //Build Trajectory Path Array List
@@ -313,19 +429,14 @@ public class RoadRunnerDataV2{
         return displacement;
     }
 
-    /** Quick Actions */
 
+    /** Quick Actions */
     public Action intakeReverse(){
         return new InstantAction (() -> robotData.getCarosel().forceReverseIntakeOn());
     }
-    public Action updateOrientation(LimeLightVision limelight){
-        return new InstantAction(()-> limelight.updateOrientationIMU());
-    }
-
     public Action updateTelemetryIn(Telemetry telemetry){
         return new InstantAction( () -> robotData.updateTelemetry(telemetry));
     }
-
     public Action intakeOn() {
         return new InstantAction(() -> robotData.getCarosel().forceIntakeOn());
     }
@@ -381,23 +492,19 @@ public class RoadRunnerDataV2{
         if (patternActive) return cycleFirstPattern();
         else return cycleFirstSlot();
     }
-
     public Action forceFeedInventory(boolean active,String color1, String color2, String color3){
         if (active) return new InstantAction(() -> robotData.getCarosel().forceFeedInventory(color1,color2,color3));
         return new InstantAction(() -> doNothing());
     }
-
     public Action forceFeedCycle(boolean active){
         if (active) return cycleFirstSlot();
         return new InstantAction( () -> doNothing());
     }
-
     public Action quickUpdateMotif(){
         return new InstantAction( () -> robotData.getCarosel().updatePattern(LimeLightVision.motifCode));
     }
 
     /** Complex Actions */
-
     public class UpdateInventory implements Action{
 
         @Override
@@ -413,7 +520,6 @@ public class RoadRunnerDataV2{
     public Action updateInveentory(){
         return new UpdateInventory();
     }
-
     public class UpdateCaroselEncdoer implements Action{
 
         @Override
@@ -463,7 +569,6 @@ public class RoadRunnerDataV2{
     public Action requestPatternFire() {
         return new RequestPatternFire();
     }
-
     public class PatternFireWaitSpeed implements Action {
 
         public double disp;
@@ -533,7 +638,6 @@ public class RoadRunnerDataV2{
     public Action patternFireWaitSpeed(double disp) {
         return new PatternFireWaitSpeed(disp);
     }
-
     public class PatternFire implements Action {
 
         public double disp;
@@ -676,17 +780,14 @@ public class RoadRunnerDataV2{
     public Action rapidFire(double disp) {
         return new RapidFire(disp);
     }
-
     public Action requestArtifactShots (boolean isPatternEnabled){
         if (isPatternEnabled) return new RequestPatternFire();
         else return new RequestRapidFire();
     }
-
     public Action shootArtifacts(double disp, boolean isPatternEnabled){
         if (isPatternEnabled) return new PatternFire(disp);
         else return new RapidFire(disp);
     }
-
     public class TurretPID implements Action{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
@@ -857,12 +958,6 @@ public class RoadRunnerDataV2{
         MecanumDrive.PARAMS.maxWheelVel = RobotConstantsV2.MAX_VEL_DEFAULT;
         MecanumDrive.PARAMS.minProfileAccel = RobotConstantsV2.MIN_ACCEL_DEFAULT;
         MecanumDrive.PARAMS.maxProfileAccel = RobotConstantsV2.MAX_ACCEL_DEFAULT;
-    }
-
-    public void steroidDriveConstants(){
-        MecanumDrive.PARAMS.maxWheelVel = RobotConstantsV2.MAX_VEL_SPEED;
-        MecanumDrive.PARAMS.minProfileAccel = RobotConstantsV2.MIN_ACCEL_SPEED;
-        MecanumDrive.PARAMS.maxProfileAccel = RobotConstantsV2.MAX_ACCEL_SPEED;
     }
 
 }

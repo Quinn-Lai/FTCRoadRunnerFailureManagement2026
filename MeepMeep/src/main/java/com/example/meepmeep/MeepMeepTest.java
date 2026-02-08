@@ -2,6 +2,7 @@ package com.example.meepmeep;
 
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
@@ -80,7 +81,7 @@ public class MeepMeepTest {
                 .splineToLinearHeading(lineBotCollect,Math.toRadians(90))
 
                 .setTangent(Math.toRadians(225))
-                .splineToLinearHeading(shootingPos,Math.toRadians(225))
+                .splineToLinearHeading(new Pose2d(-20, -15, Math.toRadians(230)),Math.toRadians(225))
 
                 .build();
 
@@ -93,13 +94,13 @@ public class MeepMeepTest {
 
                 .build();
 
-        Action park = myBot.getDrive().actionBuilder(spawn)
+        Action park = myBot.getDrive().actionBuilder(new Pose2d(9,55,Math.toRadians(115)))
                 //.splineToLinearHeading(gateBlue,0)
 
                 .turn(1)
                 .build();
 
-        myBot.runAction(closeSideRed);
+        myBot.runAction(park);
 
         meepMeep.setBackground(MeepMeep.Background.FIELD_DECODE_OFFICIAL)
                 .setDarkMode(true)
