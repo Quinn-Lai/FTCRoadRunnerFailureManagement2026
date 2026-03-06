@@ -13,12 +13,13 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 @Config
 @TeleOp
-public class TuneHSV extends LinearOpMode {
+public class TuneHSVRaw extends LinearOpMode {
 
     private NormalizedColorSensor colorSensorFront;
     private NormalizedColorSensor colorSensorBack;
     private DistanceSensor frontDist;
     private DistanceSensor backDist;
+    private float gain = 5.0f;
 
     @Override
     public void runOpMode(){
@@ -28,13 +29,25 @@ public class TuneHSV extends LinearOpMode {
         frontDist = (DistanceSensor) colorSensorFront;
         backDist = (DistanceSensor) colorSensorBack;
 
-        colorSensorFront.setGain(5);
-        colorSensorBack.setGain(5);
+        colorSensorFront.setGain(gain);
+        colorSensorBack.setGain(gain);
 
-        
+
         waitForStart();
 
         while (opModeIsActive()){
+
+            if (gamepad1.dpadUpWasPressed()){
+                gain += 1;
+            }
+
+            else if (gamepad1.dpadDownWasPressed()){
+                gain -= 1;
+            }
+
+            colorSensorFront.setGain(gain);
+            colorSensorBack.setGain(gain);
+
             float[] HSVFront = getHSVFront();
             telemetry.addLine(String.format("HSV Front: (%.5f, %.5f, %.5f)", HSVFront[0], HSVFront[1], HSVFront[2]));
             float[] HSVBack = getHSVBack();
@@ -42,6 +55,7 @@ public class TuneHSV extends LinearOpMode {
 
             telemetry.addData("Front Dist: ", frontDist.getDistance(DistanceUnit.CM));
             telemetry.addData("Back Dist: ", backDist.getDistance(DistanceUnit.CM));
+            telemetry.addData("Gain: ", gain);
             telemetry.update();
         }
 

@@ -17,10 +17,9 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
 
-/** Opens Gate Twice on First & Second Line Then Gate Intakes*/
 @Config
 @Autonomous
-public class Auto15ArtifactGateTwice extends OpMode {
+public class Auto12 extends OpMode {
 
     //Data Classes
     private LimeLightVision limeLight;
@@ -36,9 +35,6 @@ public class Auto15ArtifactGateTwice extends OpMode {
         RoadRunnerDataV2.isAutoPosStored = false;
 
         RobotConstantsV2.CAROSEL_TOLERANCE = RobotConstantsV2.CAROSEL_TOLERANCE_AUTO;
-        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
-        RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO; //Transfer Shot
-        RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
 
         rrData = new RoadRunnerDataV2(new RobotDataV2(hardwareMap, telemetry));
         limeLight = new LimeLightVision(hardwareMap,telemetry,"blue");
@@ -49,8 +45,6 @@ public class Auto15ArtifactGateTwice extends OpMode {
         limeLight.initLimeLight();
 
         LimeLightVision.isFoundMotif = false;
-        RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
-        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         rrData.getRobotData().getCarosel().forceTransferDown();
         rrData.getRobotData().getCarosel().setInventoryAuto();
@@ -61,6 +55,8 @@ public class Auto15ArtifactGateTwice extends OpMode {
         rrData.getRobotData().setStartFar(false);
         rrData.getRobotData().selectedSide();
         rrData.setDisplacement(RobotConstantsV2.CLOSE_BALL_DISTANCE);
+
+        RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY = RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY_AUTO;
     }
 
     @Override
@@ -68,7 +64,7 @@ public class Auto15ArtifactGateTwice extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU(rrData.getYaw());
+        //limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -103,13 +99,11 @@ public class Auto15ArtifactGateTwice extends OpMode {
                     Pose2d lineBot = RobotConstantsV2.LINE_BOT_PREP_BLUE;
                     Pose2d lineBotCollect = RobotConstantsV2.LINE_BOT_COLLECT_BLUE;
                     Pose2d lineMid = RobotConstantsV2.LINE_MID_PREP_BLUE;
-                    Pose2d lineMidCollect = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, -42, Math.toRadians(270));
+                    Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_BLUE;
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_BLUE;
-                    Pose2d lineTopCollect = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, -43, Math.toRadians(270));
-                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_BLUE;
+                    Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_BLUE;
 
                     //Close Side
-
                     rrData.setIntendedHeading(RobotConstantsV2.PINPOINT_HEADING_CLOSE_BLUE);
 
                     rrData.setBeginPose(RobotConstantsV2.BLUE_SPAWN_CLOSE);
@@ -126,61 +120,46 @@ public class Auto15ArtifactGateTwice extends OpMode {
                             .setTangent(Math.toRadians(30))
                             .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder topLinePrep = shootFirst.fresh()
                             .setTangent(Math.toRadians(315))
-                            .splineToLinearHeading(lineTop, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineTop, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
+                    TrajectoryActionBuilder topLineCollect = topLinePrep.fresh()
                             .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(lineTopCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
                             .setTangent(Math.toRadians(0))
                             .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_BLUE, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_BLUE)
-                            .setTangent(Math.toRadians(90))
+                    TrajectoryActionBuilder shootSecond = topLineCollect.fresh()
+                            .setTangent(Math.toRadians(110))
                             .splineToLinearHeading(shootingPos,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),  new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder middleLinePrep = shootSecond.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineMid, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineMid, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                    TrajectoryActionBuilder middleLineCollect = middleLinePrep.fresh()
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
 
-                            .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(gate,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
-
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(gate)
+                    TrajectoryActionBuilder shootThird = middleLineCollect.fresh()
                             .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-
-                    //Gate Intake
-
-                    TrajectoryActionBuilder gateIntake = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder bottomLinePrep = shootThird.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineBot, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder shootGate = rrData.getDrive().actionBuilder(RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE)
-                            .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
-
-
-                    TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                            .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineBot, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
-
-                    TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().actionBuilder(lineBot)
+                    TrajectoryActionBuilder bottomLineCollect = bottomLinePrep.fresh()
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineBotCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineBotCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
 
-                    TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineBotCollect)
+                    TrajectoryActionBuilder shootFourth = bottomLineCollect.fresh()
                             .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(RobotConstantsV2.OFF_LINE_BLUE_SHOOT_CLOSE,Math.toRadians(135), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder parkGate = rrData.getDrive().actionBuilder(RobotConstantsV2.OFF_LINE_BLUE_SHOOT_CLOSE)
+                    TrajectoryActionBuilder parkGate = shootFourth.fresh()
                             .setTangent(Math.toRadians(0))
                             .splineToLinearHeading(RobotConstantsV2.PARK_GATE_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
@@ -194,17 +173,11 @@ public class Auto15ArtifactGateTwice extends OpMode {
                             middleLinePrep,
                             middleLineCollect,
                             shootThird,
-
-                            gateIntake,
-                            shootGate,
-
-
                             bottomLinePrep,
                             bottomLineCollect,
                             shootFourth,
                             parkGate
                     });
-
                 }
 
                 //Trajectory Right
@@ -212,11 +185,9 @@ public class Auto15ArtifactGateTwice extends OpMode {
                     Pose2d lineBot = RobotConstantsV2.LINE_BOT_PREP_RED;
                     Pose2d lineBotCollect = RobotConstantsV2.LINE_BOT_COLLECT_RED;
                     Pose2d lineMid = RobotConstantsV2.LINE_MID_PREP_RED;
-                    Pose2d lineMidCollect = new Pose2d(RobotConstantsV2.LINE_MID_PREP_TRAVEL, 42, Math.toRadians(90));
+                    Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_RED;
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_RED;
-                    Pose2d lineTopCollect = new Pose2d(-RobotConstantsV2.LINE_TOP_PREP_TRAVEL, 43, Math.toRadians(90));;
-
-                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_RED;
+                    Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_RED;
 
                     //Close Side
 
@@ -236,57 +207,46 @@ public class Auto15ArtifactGateTwice extends OpMode {
                             .setTangent(Math.toRadians(330))
                             .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder topLinePrep = shootFirst.fresh()
                             .setTangent(Math.toRadians(45))
-                            .splineToLinearHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLineCollect = rrData.getDrive().actionBuilder(lineTop)
+                    TrajectoryActionBuilder topLineCollect = topLinePrep.fresh()
                             .setTangent(Math.toRadians(90))
                             .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
                             .setTangent(Math.toRadians(0))
                             .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_RED, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().actionBuilder(RobotConstantsV2.SLAM_GATE_RED)
-                            .setTangent(Math.toRadians(270))
+                    TrajectoryActionBuilder shootSecond = topLineCollect.fresh()
+                            .setTangent(Math.toRadians(260))
                             .splineToLinearHeading(shootingPos,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder middleLinePrep = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder middleLinePrep = shootSecond.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineMid, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineMid, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder middleLineCollect = rrData.getDrive().actionBuilder(lineMid)
+                    TrajectoryActionBuilder middleLineCollect = middleLinePrep.fresh()
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
 
-                            .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(gate,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
-
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().actionBuilder(gate)
+                    TrajectoryActionBuilder shootThird = middleLineCollect.fresh()
                             .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder gateIntake = rrData.getDrive().actionBuilder(shootingPos)
+                    TrajectoryActionBuilder bottomLinePrep = shootThird.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(RobotConstantsV2.COLLECT_GATE_CLOSE_RED,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToSplineHeading(lineBot, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder shootGate = rrData.getDrive().actionBuilder(RobotConstantsV2.COLLECT_GATE_CLOSE_RED)
-                            .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
-
-                    TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().actionBuilder(shootingPos)
-                            .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineBot, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
-
-                    TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().actionBuilder(lineBot)
+                    TrajectoryActionBuilder bottomLineCollect = bottomLinePrep.fresh()
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineBotCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+                            .splineToLinearHeading(lineBotCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
 
-                    TrajectoryActionBuilder shootFourth = rrData.getDrive().actionBuilder(lineBotCollect)
+                    TrajectoryActionBuilder shootFourth = bottomLineCollect.fresh()
                             .setTangent(Math.toRadians(270))
                             .splineToLinearHeading(RobotConstantsV2.OFF_LINE_RED_SHOOT_CLOSE,Math.toRadians(225), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder parkGate = rrData.getDrive().actionBuilder(RobotConstantsV2.OFF_LINE_RED_SHOOT_CLOSE)
+                    TrajectoryActionBuilder parkGate = shootFourth.fresh()
                             .setTangent(Math.toRadians(0))
                             .splineToLinearHeading(RobotConstantsV2.PARK_GATE_RED,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
@@ -299,10 +259,6 @@ public class Auto15ArtifactGateTwice extends OpMode {
                             middleLinePrep,
                             middleLineCollect,
                             shootThird,
-
-                            gateIntake,
-                            shootGate,
-
                             bottomLinePrep,
                             bottomLineCollect,
                             shootFourth,
@@ -343,19 +299,21 @@ public class Auto15ArtifactGateTwice extends OpMode {
             LimeLightVision.failsafeMotif();
         }
 
-        //Far side Auto
+        rrData.getRobotData().getTurret().switchAutoSetPos();
         rrData.getRobotData().getTurret().toggleTurretFar(false);
 
         SequentialAction collectFirstLine = new SequentialAction(
-                rrData.forceFeedCycle(forceFeedActive),
-                rrData.getTrajectory(2),
+
                 rrData.intakeOn(),
+                rrData.getTrajectory(2),
+
                 rrData.startFailsafeTimer(),
+
                 new ParallelAction(
                         rrData.getTrajectory(3),
                         rrData.checkAutoIntake()
                 ),
-                rrData.intakeOff(),
+                rrData.intakeReverse(),
                 rrData.forceFeedInventory(forceFeedActive, "Purple","Purple", "Green"),
                 rrData.cycleQuickSlot(patternEnabled)
         );
@@ -366,13 +324,13 @@ public class Auto15ArtifactGateTwice extends OpMode {
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
                 rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown()
+                rrData.forceTransferDown(),
+                rrData.cycleFirstSlot()
         );
 
         SequentialAction collectSecondLine = new SequentialAction(
-                rrData.forceFeedCycle(forceFeedActive),
-                rrData.getTrajectory(5),
                 rrData.intakeOn(),
+                rrData.getTrajectory(5),
                 rrData.startFailsafeTimer(),
                 new ParallelAction(
                         rrData.getTrajectory(6),
@@ -389,38 +347,16 @@ public class Auto15ArtifactGateTwice extends OpMode {
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
                 rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown()
-        );
-
-        SequentialAction intakeGate = new SequentialAction(
-                rrData.forceFeedCycle(forceFeedActive),
-
-                rrData.getTrajectory(8),
-                rrData.startFailsafeTimer(),
-                rrData.intakeOn(),
-                rrData.checkAutoIntake(),
-
-                rrData.intakeReverse(),
-                rrData.cycleQuickSlot(patternEnabled)
-        );
-
-        SequentialAction shootGate = new SequentialAction(
-                rrData.getTrajectory(9),
-                rrData.intakeOff(),
-                rrData.waitForTurret(isWaitTurret),
-                rrData.requestArtifactShots(patternEnabled),
-                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
                 rrData.forceTransferDown(),
-                rrData.cycleQuickSlot(patternEnabled)
+                rrData.cycleFirstSlot()
         );
 
         SequentialAction collectThirdLine = new SequentialAction(
-                rrData.forceFeedCycle(forceFeedActive),
-                rrData.getTrajectory(10),
                 rrData.intakeOn(),
+                rrData.getTrajectory(8),
                 rrData.startFailsafeTimer(),
                 new ParallelAction(
-                        rrData.getTrajectory(11),
+                        rrData.getTrajectory(9),
                         rrData.checkAutoIntake()
                 ),
                 rrData.intakeReverse(),
@@ -429,24 +365,24 @@ public class Auto15ArtifactGateTwice extends OpMode {
         );
 
         SequentialAction shootThirdLine = new SequentialAction(
-                rrData.getTrajectory(12),
+                rrData.getTrajectory(10),
                 rrData.intakeOff(),
+
+                rrData.setDisplacementQuick(RobotConstantsV2.OFF_LINE_BALL_DISTANCE),
+
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
                 rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown(),
-                rrData.cycleQuickSlot(patternEnabled)
+                rrData.forceTransferDown()
         );
 
         SequentialAction[] buildBear = new SequentialAction[]{
-                collectFirstLine,
-                shootFirstLine,
-                collectSecondLine,
-                shootSecondLine,
-                intakeGate,
-                shootGate,
-                collectThirdLine,
-                shootThirdLine,
+                collectFirstLine,   //0
+                shootFirstLine,     //1
+                collectSecondLine,  //2
+                shootSecondLine,    //3
+                collectThirdLine,   //4
+                shootThirdLine,     //5
         };
 
         rrData.setLoopStatus(true);
@@ -475,6 +411,7 @@ public class Auto15ArtifactGateTwice extends OpMode {
                                 rrData.requestArtifactShots(false),
                                 rrData.shootArtifacts(rrData.getDisplacement(), false),
                                 rrData.forceTransferDown(),
+                                rrData.cycleFirstSlot(),
 
                                 buildBear[0],
                                 buildBear[1],
@@ -482,18 +419,23 @@ public class Auto15ArtifactGateTwice extends OpMode {
                                 buildBear[3],
                                 buildBear[4],
                                 buildBear[5],
-                                buildBear[6],
-                                buildBear[7],
 
                                 rrData.setLooping(false),
 
                                 rrData.killTurret(),
-                                rrData.getTrajectory(13),
-                                rrData.killTurret()
 
-                        )
+                                rrData.getTrajectory(11),
+
+                                rrData.killTurret()
+                                )
                 )
         );
+
+        //rrData.getRobotData().getTurret().killShooter();
+
+        RoadRunnerDataV2.isAutoPosStored = true;
+        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose();
+
     }
 
     @Override
@@ -506,11 +448,12 @@ public class Auto15ArtifactGateTwice extends OpMode {
 
         rrData.setLooping(false);
 
-        RoadRunnerDataV2.isAutoPosStored = true;
-        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
+        if (rrData.getDrive() != null){
+            RoadRunnerDataV2.isAutoPosStored = true;
+            RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose();
+        }
 
         telemetry.addLine("Autonomous Completed!");
-        telemetry.addData("Time Spent: ", RobotDataV2.getRuntime());
         telemetry.update();
 
         limeLight.killLimeLight();

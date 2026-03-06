@@ -1,12 +1,10 @@
 package org.firstinspires.ftc.teamcode.RobotV2.Autonomous;
 
 import com.acmerobotics.dashboard.config.Config;
-import com.acmerobotics.roadrunner.AccelConstraint;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
-import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
@@ -34,14 +32,12 @@ public class AutoFarCorner extends OpMode {
     @Override
     public void init(){
 
-        RoadRunnerDataV2.isAutoPosStored = false; //TODO rememeber
-
-        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
-        RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO;
-        RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
+        RoadRunnerDataV2.isAutoPosStored = false;
 
         rrData = new RoadRunnerDataV2(new RobotDataV2(hardwareMap, telemetry));
         limeLight = new LimeLightVision(hardwareMap,telemetry,"blue");
+
+        RobotConstantsV2.AUTO_FAILSAFE_TIMER = RobotConstantsV2.AUTO_FAILSAFE_TIMER_FAR;
 
         rrData.createDashboard();
 
@@ -49,7 +45,6 @@ public class AutoFarCorner extends OpMode {
         limeLight.initLimeLight();
 
         LimeLightVision.isFoundMotif = false;
-        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         rrData.getRobotData().getCarosel().forceTransferDown();
         rrData.getRobotData().getCarosel().setInventoryAuto();
@@ -62,6 +57,7 @@ public class AutoFarCorner extends OpMode {
         rrData.getRobotData().selectedSide();
         rrData.setDisplacement(RobotConstantsV2.FAR_BALL_DISTANCE);
 
+        RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY = RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY_AUTO;
     }
 
     @Override
@@ -69,7 +65,7 @@ public class AutoFarCorner extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU(rrData.getYaw());
+        //limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -107,7 +103,6 @@ public class AutoFarCorner extends OpMode {
 
                     Pose2d spawn = rrData.getBeginPose();
                     Pose2d shootingPos = RobotConstantsV2.BLUE_SHOOT_FAR;
-                    Pose2d corner = RobotConstantsV2.CORNER_BLUE;
 
                     //Each Route
 
@@ -116,17 +111,33 @@ public class AutoFarCorner extends OpMode {
                             .splineToLinearHeading(shootingPos,Math.toRadians(180));
 
                     TrajectoryActionBuilder collectCorner = rrData.getDrive().actionBuilder(shootingPos)
-                            .setTangent(Math.toRadians(225))
-                            .splineToLinearHeading(corner,Math.toRadians(315));
-
-                    TrajectoryActionBuilder returnShoot = rrData.getDrive().actionBuilder(corner)
+                            //.turn(Math.toRadians(30))
+                            .setTangent(Math.toRadians(270))
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
                             .setTangent(Math.toRadians(135))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(145));
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_BLUE_SHIMMY,Math.toRadians(225),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
+                            .setTangent(Math.toRadians(45))
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_BLUE,Math.toRadians(315), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder returnShoot = collectCorner.fresh()
+                            .setTangent(Math.toRadians(135))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(145), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+
+                    TrajectoryActionBuilder park = rrData.getDrive().actionBuilder(shootingPos)
+                            .setTangent(Math.toRadians(180))
+                            .lineToX(-40);
 
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
                             shootFirst,
+
+                            collectCorner,
+                            returnShoot,
+
+                            collectCorner,
+                            returnShoot,
+
                             collectCorner,
                             returnShoot,
 
@@ -136,8 +147,7 @@ public class AutoFarCorner extends OpMode {
                             collectCorner,
                             returnShoot,
 
-                            collectCorner,
-                            returnShoot
+                            park
                     });
                 }
 
@@ -151,7 +161,6 @@ public class AutoFarCorner extends OpMode {
                     //Common Positions
                     Pose2d spawn = rrData.getBeginPose();
                     Pose2d shootingPos = RobotConstantsV2.RED_SHOOT_FAR;
-                    Pose2d corner = RobotConstantsV2.CORNER_RED;
 
                     //Each Route
 
@@ -160,16 +169,32 @@ public class AutoFarCorner extends OpMode {
                             .splineToLinearHeading(shootingPos,Math.toRadians(180));
 
                     TrajectoryActionBuilder collectCorner = rrData.getDrive().actionBuilder(shootingPos)
-                            .setTangent(Math.toRadians(135))
-                            .splineToLinearHeading(corner,Math.toRadians(45));
-
-                    TrajectoryActionBuilder returnShoot = rrData.getDrive().actionBuilder(corner)
+                            //.turn(Math.toRadians(-30))
+                            .setTangent(Math.toRadians(90))
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_RED,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
                             .setTangent(Math.toRadians(225))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(315));
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_RED_SHIMMY,Math.toRadians(135),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
+                            .setTangent(Math.toRadians(315))
+                            .splineToSplineHeading(RobotConstantsV2.CORNER_RED,Math.toRadians(45), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder returnShoot = collectCorner.fresh()
+                            .setTangent(Math.toRadians(225))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(315), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+
+                    TrajectoryActionBuilder park = rrData.getDrive().actionBuilder(shootingPos)
+                            .setTangent(Math.toRadians(180))
+                            .lineToX(40);
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
                             shootFirst,
+
+                            collectCorner,
+                            returnShoot,
+
+                            collectCorner,
+                            returnShoot,
+
                             collectCorner,
                             returnShoot,
 
@@ -179,8 +204,7 @@ public class AutoFarCorner extends OpMode {
                             collectCorner,
                             returnShoot,
 
-                            collectCorner,
-                            returnShoot
+                            park
 
                     });
 
@@ -245,51 +269,16 @@ public class AutoFarCorner extends OpMode {
                                 //First Ball
 
                                 rrData.requestArtifactShots(patternEnabled),
-                                rrData.patternFireWaitSpeed(rrData.getDisplacement()),
+                                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
                                 rrData.forceTransferDown(),
+                                rrData.cycleFirstSlot(),
 
+                                //Second Set
+                                getFarPath(2,3),
 
-                                //Second Ball (Intake + Shoot)
-                                rrData.intakeOn(),
-                                rrData.startFailsafeTimer(),
+                                //Third Set
+                                getFarPath(4,5),
 
-                                new ParallelAction(
-                                        rrData.getTrajectory(2),
-                                        rrData.checkAutoIntake()
-                                ),
-
-                                rrData.intakeReverse(),
-                                rrData.cycleQuickSlot(patternEnabled),
-
-                                rrData.getTrajectory(3),
-                                rrData.intakeOff(),
-
-                                //rrData.waitForTurret(isWaitTurret),
-                                rrData.requestArtifactShots(patternEnabled),
-                                rrData.patternFireWaitSpeed(rrData.getDisplacement()),
-                                rrData.forceTransferDown(),
-
-                                //Third Ball (Intake + Shoot)
-                                rrData.intakeOn(),
-                                rrData.startFailsafeTimer(),
-
-                                new ParallelAction(
-                                        rrData.getTrajectory(4),
-                                        rrData.checkAutoIntake()
-                                ),
-
-                                rrData.intakeReverse(),
-                                rrData.cycleQuickSlot(patternEnabled),
-
-                                rrData.getTrajectory(5),
-                                rrData.intakeOff(),
-
-                                //rrData.waitForTurret(isWaitTurret),
-                                rrData.requestArtifactShots(patternEnabled),
-                                rrData.patternFireWaitSpeed(rrData.getDisplacement()),
-                                rrData.forceTransferDown(),
-
-                                //Fourth Ball (Intake + Shoot)
                                 rrData.intakeOn(),
                                 rrData.startFailsafeTimer(),
 
@@ -298,37 +287,19 @@ public class AutoFarCorner extends OpMode {
                                         rrData.checkAutoIntake()
                                 ),
 
-                                rrData.intakeReverse(),
-                                rrData.cycleQuickSlot(patternEnabled),
 
-                                rrData.getTrajectory(7),
-                                rrData.intakeOff(),
+//
+//                                //Fourth Set
+//                                getFarPath(6,7),
+//
+//                                //Fifth Set
+//                                getFarPath(8,9),
+//
+//                                //Sixth Set
+//                                getFarPath(10,11),
 
-                                //rrData.waitForTurret(isWaitTurret),
-                                rrData.requestArtifactShots(patternEnabled),
-                                rrData.patternFireWaitSpeed(rrData.getDisplacement()),
-                                rrData.forceTransferDown(),
-
-
-                                //Fifth Ball (Intake + Shoot)
-                                rrData.intakeOn(),
-                                rrData.startFailsafeTimer(),
-
-                                new ParallelAction(
-                                        rrData.getTrajectory(8),
-                                        rrData.checkAutoIntake()
-                                ),
-
-                                rrData.intakeReverse(),
-                                rrData.cycleQuickSlot(patternEnabled),
-
-                                rrData.getTrajectory(9),
-                                rrData.intakeOff(),
-
-                                //rrData.waitForTurret(isWaitTurret),
-                                rrData.requestArtifactShots(patternEnabled),
-                                rrData.patternFireWaitSpeed(rrData.getDisplacement()),
-                                rrData.forceTransferDown(),
+                                //Park
+                                //rrData.getTrajectory(12),
 
                                 rrData.setLooping(false),
                                 rrData.killTurret()
@@ -345,8 +316,10 @@ public class AutoFarCorner extends OpMode {
     @Override
     public void stop() {
 
-        RoadRunnerDataV2.isAutoPosStored = true; //TODO rememeber
-        RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose(); //Get last pos
+        if (rrData.getDrive() != null){
+            RoadRunnerDataV2.isAutoPosStored = true;
+            RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose();
+        }
 
         rrData.setLooping(false);
 
@@ -357,4 +330,30 @@ public class AutoFarCorner extends OpMode {
 
         limeLight.killLimeLight();
     }
+
+    private SequentialAction getFarPath(int go, int back){
+        return new SequentialAction(
+                rrData.intakeOn(),
+                rrData.startFailsafeTimer(),
+
+                new ParallelAction(
+                        rrData.getTrajectory(go),
+                        rrData.checkAutoIntake()
+                ),
+
+                rrData.intakeReverse(),
+                rrData.cycleQuickSlot(patternEnabled),
+
+                rrData.getTrajectory(back),
+                rrData.intakeOff(),
+
+                //rrData.waitForTurret(isWaitTurret),
+                rrData.requestArtifactShots(patternEnabled),
+                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                rrData.forceTransferDown(),
+                rrData.cycleFirstSlot()
+        );
+    }
+
+
 }

@@ -3,12 +3,12 @@ package org.firstinspires.ftc.teamcode.RobotV2.Autonomous;
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.LimeLightVision;
@@ -17,10 +17,9 @@ import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotConstantsV2;
 import org.firstinspires.ftc.teamcode.RobotV2.ClassData.RobotDataV2;
 
 
-@Disabled
 @Config
 @Autonomous
-public class AutoExtraAlignCorrect extends OpMode {
+public class Auto12DoubleGate extends OpMode {
 
     //Data Classes
     private LimeLightVision limeLight;
@@ -28,13 +27,14 @@ public class AutoExtraAlignCorrect extends OpMode {
 
     private static boolean patternEnabled = true;
     private boolean isWaitTurret = false; //false
+    private boolean forceFeedActive = true;
 
     @Override
     public void init(){
 
-        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_AUTO;
-        RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_AUTO; //Transfer Shot
-        RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_AUTO;
+        RoadRunnerDataV2.isAutoPosStored = false;
+
+        RobotConstantsV2.CAROSEL_TOLERANCE = RobotConstantsV2.CAROSEL_TOLERANCE_AUTO;
 
         rrData = new RoadRunnerDataV2(new RobotDataV2(hardwareMap, telemetry));
         limeLight = new LimeLightVision(hardwareMap,telemetry,"blue");
@@ -45,8 +45,6 @@ public class AutoExtraAlignCorrect extends OpMode {
         limeLight.initLimeLight();
 
         LimeLightVision.isFoundMotif = false;
-        RobotConstantsV2.CAROSEL_GLOBAL_INCREMENT = 0;
-        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         rrData.getRobotData().getCarosel().forceTransferDown();
         rrData.getRobotData().getCarosel().setInventoryAuto();
@@ -57,6 +55,8 @@ public class AutoExtraAlignCorrect extends OpMode {
         rrData.getRobotData().setStartFar(false);
         rrData.getRobotData().selectedSide();
         rrData.setDisplacement(RobotConstantsV2.CLOSE_BALL_DISTANCE);
+
+        RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY = RobotConstantsV2.CAROSEL_DETECTED_ARTIFACT_DELAY_AUTO;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class AutoExtraAlignCorrect extends OpMode {
 
         //Color Selection & OpenCV
 
-        limeLight.updateOrientationIMU(rrData.getYaw());
+        //limeLight.updateOrientationIMU(rrData.getYaw());
         limeLight.updateMotifCode();
 
         if (rrData.getRobotData().isPendingPosition()){
@@ -102,10 +102,7 @@ public class AutoExtraAlignCorrect extends OpMode {
                     Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_BLUE;
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_BLUE;
                     Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_BLUE;
-
-                    Pose2d collectFromGateClose = RobotConstantsV2.COLLECT_GATE_CLOSE_BLUE;
-                    Pose2d collectFromGateFar = RobotConstantsV2.COLLECT_GATE_FAR_BLUE;
-                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_BLUE;
+                    Pose2d gate = RobotConstantsV2.GATE_MIDDLE_LINE_OPEN_BLUE;
 
                     //Close Side
 
@@ -121,47 +118,57 @@ public class AutoExtraAlignCorrect extends OpMode {
 
                     //Each Route
 
-                    //30
-                    //45
-                    TrajectoryActionBuilder shootFirst = rrData.getDrive().correctionActionBuilder(spawn)
+                    TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                             .setTangent(Math.toRadians(30))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(shootingPos,Math.toRadians(30),new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
+                    TrajectoryActionBuilder topLinePrep = shootFirst.fresh()
                             .setTangent(Math.toRadians(315))
-                            .splineToLinearHeading(lineTop, Math.toRadians(270));
+                            .splineToSplineHeading(lineTop, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLineCollect = rrData.getDrive().correctionActionBuilder(lineTop)
+                    TrajectoryActionBuilder topLineCollect = topLinePrep.fresh()
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineTopCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                            .splineToLinearHeading(lineTopCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().correctionActionBuilder(lineTopCollect)
-                            .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(90));
-
-                    TrajectoryActionBuilder middleLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineMid, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_BLUE, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
-                    TrajectoryActionBuilder middleLineCollect = rrData.getDrive().correctionActionBuilder(lineMid)
-                            .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
-
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().correctionActionBuilder(lineMidCollect)
+                    TrajectoryActionBuilder shootSecond = topLineCollect.fresh()
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(shootingPos,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),  new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
+                    TrajectoryActionBuilder middleLinePrep = shootSecond.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineBot, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToSplineHeading(lineMid, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED),new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().correctionActionBuilder(lineBot)
+                    TrajectoryActionBuilder middleLineCollect = middleLinePrep.fresh()
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(lineBotCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootFourth = rrData.getDrive().correctionActionBuilder(lineBotCollect)
-                            .setTangent(Math.toRadians(135))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(135), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .setTangent(Math.toRadians(180))
+                            .splineToLinearHeading(RobotConstantsV2.GATE_MIDDLE_LINE_OPEN_BLUE,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
+
+
+                    TrajectoryActionBuilder shootThird = middleLineCollect.fresh()
+                            .setTangent(Math.toRadians(90))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder bottomLinePrep = shootThird.fresh()
+                            .setTangent(Math.toRadians(0))
+                            .splineToSplineHeading(lineBot, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder bottomLineCollect = bottomLinePrep.fresh()
+                            .setTangent(Math.toRadians(270))
+                            .splineToLinearHeading(lineBotCollect,Math.toRadians(270),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
+
+                    TrajectoryActionBuilder shootFourth = bottomLineCollect.fresh()
+                            .setTangent(Math.toRadians(90))
+                            .splineToLinearHeading(RobotConstantsV2.OFF_LINE_BLUE_SHOOT_CLOSE,Math.toRadians(135), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder parkGate = shootFourth.fresh()
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.PARK_GATE_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -174,7 +181,8 @@ public class AutoExtraAlignCorrect extends OpMode {
                             shootThird,
                             bottomLinePrep,
                             bottomLineCollect,
-                            shootFourth
+                            shootFourth,
+                            parkGate
                     });
 
                 }
@@ -187,10 +195,7 @@ public class AutoExtraAlignCorrect extends OpMode {
                     Pose2d lineMidCollect = RobotConstantsV2.LINE_MID_COLLECT_RED;
                     Pose2d lineTop = RobotConstantsV2.LINE_TOP_PREP_RED;
                     Pose2d lineTopCollect = RobotConstantsV2.LINE_TOP_COLLECT_RED;
-
-                    Pose2d collectFromGateClose = RobotConstantsV2.COLLECT_GATE_CLOSE_RED;
-                    Pose2d collectFromGateFar = RobotConstantsV2.COLLECT_GATE_FAR_RED;
-                    Pose2d gate = RobotConstantsV2.GATE_OPEN_POSITION_RED;
+                    Pose2d gate = RobotConstantsV2.GATE_MIDDLE_LINE_OPEN_RED;
 
                     //Close Side
 
@@ -206,48 +211,55 @@ public class AutoExtraAlignCorrect extends OpMode {
 
                     //Each Route
 
-                    //330
-                    //315
-                    TrajectoryActionBuilder shootFirst = rrData.getDrive().correctionActionBuilder(spawn)
+                    TrajectoryActionBuilder shootFirst = rrData.getDrive().actionBuilder(spawn)
                             .setTangent(Math.toRadians(330))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(shootingPos,Math.toRadians(330), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
+                    TrajectoryActionBuilder topLinePrep = shootFirst.fresh()
                             .setTangent(Math.toRadians(45))
-                            .splineToLinearHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToSplineHeading(lineTop, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder topLineCollect = rrData.getDrive().correctionActionBuilder(lineTop)
+                    TrajectoryActionBuilder topLineCollect = topLinePrep.fresh()
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                            .splineToLinearHeading(lineTopCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootSecond = rrData.getDrive().correctionActionBuilder(lineTopCollect)
-                            .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
-
-                    TrajectoryActionBuilder middleLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineMid, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(RobotConstantsV2.SLAM_GATE_RED, Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
-                    TrajectoryActionBuilder middleLineCollect = rrData.getDrive().correctionActionBuilder(lineMid)
-                            .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
-
-                    TrajectoryActionBuilder shootThird = rrData.getDrive().correctionActionBuilder(lineMidCollect)
+                    TrajectoryActionBuilder shootSecond = topLineCollect.fresh()
                             .setTangent(Math.toRadians(270))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToLinearHeading(shootingPos,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder bottomLinePrep = rrData.getDrive().correctionActionBuilder(shootingPos)
+                    TrajectoryActionBuilder middleLinePrep = shootSecond.fresh()
                             .setTangent(Math.toRadians(0))
-                            .splineToLinearHeading(lineBot, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .splineToSplineHeading(lineMid, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
-                    TrajectoryActionBuilder bottomLineCollect = rrData.getDrive().correctionActionBuilder(lineBot)
+                    TrajectoryActionBuilder middleLineCollect = middleLinePrep.fresh()
                             .setTangent(Math.toRadians(90))
-                            .splineToLinearHeading(lineBotCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SLOW_SPEED));
+                            .splineToLinearHeading(lineMidCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED))
 
-                    TrajectoryActionBuilder shootFourth = rrData.getDrive().correctionActionBuilder(lineBotCollect)
-                            .setTangent(Math.toRadians(225))
-                            .splineToLinearHeading(shootingPos,Math.toRadians(225), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED));
+                            .setTangent(Math.toRadians(180))
+                            .splineToLinearHeading(RobotConstantsV2.GATE_MIDDLE_LINE_OPEN_RED,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_GATE_SPEED));
 
+                    TrajectoryActionBuilder shootThird = middleLineCollect.fresh()
+                            .setTangent(Math.toRadians(270))
+                            .splineToLinearHeading(shootingPos,Math.toRadians(180), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder bottomLinePrep = shootThird.fresh()
+                            .setTangent(Math.toRadians(0))
+                            .splineToSplineHeading(lineBot, Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder bottomLineCollect = bottomLinePrep.fresh()
+                            .setTangent(Math.toRadians(90))
+                            .splineToLinearHeading(lineBotCollect,Math.toRadians(90),new TranslationalVelConstraint(RobotConstantsV2.AUTO_SUPER_SLOW_SPEED));
+
+                    TrajectoryActionBuilder shootFourth = bottomLineCollect.fresh()
+                            .setTangent(Math.toRadians(270))
+                            .splineToLinearHeading(RobotConstantsV2.OFF_LINE_RED_SHOOT_CLOSE,Math.toRadians(225), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
+
+                    TrajectoryActionBuilder parkGate = shootFourth.fresh()
+                            .setTangent(Math.toRadians(0))
+                            .splineToLinearHeading(RobotConstantsV2.PARK_GATE_RED,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.AUTO_FAST_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED));
 
                     //Insert Trajectory Paths Here
                     rrData.createTrajectoryPath(new TrajectoryActionBuilder[]{
@@ -260,7 +272,8 @@ public class AutoExtraAlignCorrect extends OpMode {
                             shootThird,
                             bottomLinePrep,
                             bottomLineCollect,
-                            shootFourth
+                            shootFourth,
+                            parkGate
                     });
                 }
 
@@ -280,8 +293,9 @@ public class AutoExtraAlignCorrect extends OpMode {
             telemetry.addData("Starting Side", rrData.getRobotData().getStartingSide());
             telemetry.addData("Starting Position", rrData.getRobotData().getStartingPosition());
             telemetry.addData("Starting Color: ", limeLight.getAlliance());
-            telemetry.addData("Pin Point Heading: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
+            //telemetry.addData("Pin Point Heading: ", rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees());
             telemetry.addData("Pin Point Working: ", rrData.isPinpointHeadingCorrect(rrData.getDrive().getLocalizerPinpoint().getHeadingLocalizerDegrees()));
+
             telemetry.update();
         }
 
@@ -296,51 +310,43 @@ public class AutoExtraAlignCorrect extends OpMode {
             LimeLightVision.failsafeMotif();
         }
 
-        //Far side Auto
-
-        if (rrData.getRobotData().isStartFar()){
-//            telemetry.addLine("Beginning Auto: Far Side");
-//            telemetry.update();
-            rrData.getRobotData().getTurret().toggleTurretFar(true);
-        }
-
-        //Close Side Auto
-        else{
-//            telemetry.addLine("Beginning Auto: Close Side");
-//            telemetry.update();
-            rrData.getRobotData().getTurret().toggleTurretFar(false);
-        }
-
+        rrData.getRobotData().getTurret().toggleTurretFar(false);
         SequentialAction collectFirstLine = new SequentialAction(
-                rrData.getTrajectory(2),
+
                 rrData.intakeOn(),
+                rrData.getTrajectory(2),
+
                 rrData.startFailsafeTimer(),
+
                 new ParallelAction(
                         rrData.getTrajectory(3),
                         rrData.checkAutoIntake()
                 ),
                 rrData.intakeReverse(),
-                rrData.cycleQuickSlot(patternEnabled)
+                rrData.forceFeedInventory(forceFeedActive, "Purple","Purple", "Green"),
+                rrData.cycleQuickSlot(false)
         );
 
         SequentialAction shootFirstLine = new SequentialAction(
                 rrData.getTrajectory(4),
                 rrData.intakeOff(),
                 rrData.waitForTurret(isWaitTurret),
-                rrData.requestArtifactShots(patternEnabled),
-                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown()
+                rrData.requestArtifactShots(false),
+                rrData.shootArtifacts(rrData.getDisplacement(), false),
+                rrData.forceTransferDown(),
+                rrData.cycleFirstSlot()
         );
 
         SequentialAction collectSecondLine = new SequentialAction(
-                rrData.getTrajectory(5),
                 rrData.intakeOn(),
+                rrData.getTrajectory(5),
                 rrData.startFailsafeTimer(),
                 new ParallelAction(
                         rrData.getTrajectory(6),
                         rrData.checkAutoIntake()
                 ),
                 rrData.intakeReverse(),
+                rrData.forceFeedInventory(forceFeedActive, "Purple","Green","Purple"),
                 rrData.cycleQuickSlot(patternEnabled)
         );
 
@@ -350,46 +356,42 @@ public class AutoExtraAlignCorrect extends OpMode {
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
                 rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown()
+                rrData.forceTransferDown(),
+                rrData.cycleFirstSlot()
         );
 
         SequentialAction collectThirdLine = new SequentialAction(
-                rrData.getTrajectory(8),
                 rrData.intakeOn(),
+                rrData.getTrajectory(8),
                 rrData.startFailsafeTimer(),
                 new ParallelAction(
                         rrData.getTrajectory(9),
                         rrData.checkAutoIntake()
                 ),
                 rrData.intakeReverse(),
+                rrData.forceFeedInventory(forceFeedActive,"Green","Purple","Purple"),
                 rrData.cycleQuickSlot(patternEnabled)
         );
 
         SequentialAction shootThirdLine = new SequentialAction(
                 rrData.getTrajectory(10),
                 rrData.intakeOff(),
+
+                rrData.setDisplacementQuick(RobotConstantsV2.OFF_LINE_BALL_DISTANCE),
+
                 rrData.waitForTurret(isWaitTurret),
                 rrData.requestArtifactShots(patternEnabled),
                 rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
-                rrData.forceTransferDown(),
-                rrData.cycleQuickSlot(patternEnabled)
-        );
-
-        SequentialAction collectCloseGate = new SequentialAction(
-
-        );
-
-        SequentialAction collectFarGate = new SequentialAction(
-
+                rrData.forceTransferDown()
         );
 
         SequentialAction[] buildBear = new SequentialAction[]{
-                collectFirstLine,   //0
-                shootFirstLine,     //1
-                collectSecondLine,  //2
-                shootSecondLine,    //3
-                collectThirdLine,   //4
-                shootThirdLine,     //5
+                    collectFirstLine,   //0
+                    shootFirstLine,     //1
+                    collectSecondLine,  //2
+                    shootSecondLine,    //3
+                    collectThirdLine,   //4
+                    shootThirdLine,     //5
         };
 
         rrData.setLoopStatus(true);
@@ -398,7 +400,7 @@ public class AutoExtraAlignCorrect extends OpMode {
                 new ParallelAction(
 
                         //Repeated Stuff
-                        //rrData.updateInveentory(),
+
                         rrData.indicatorsUpdate(limeLight),
                         rrData.turretPID(),
                         rrData.locateAprilTag(limeLight),
@@ -415,9 +417,10 @@ public class AutoExtraAlignCorrect extends OpMode {
 
                                 //First Ball
 
-                                rrData.requestArtifactShots(patternEnabled),
-                                rrData.shootArtifacts(rrData.getDisplacement(), patternEnabled),
+                                rrData.requestArtifactShots(false),
+                                rrData.shootArtifacts(rrData.getDisplacement(), false),
                                 rrData.forceTransferDown(),
+                                rrData.cycleFirstSlot(),
 
                                 buildBear[0],
                                 buildBear[1],
@@ -426,7 +429,11 @@ public class AutoExtraAlignCorrect extends OpMode {
                                 buildBear[4],
                                 buildBear[5],
 
-                                rrData.setLooping(false)
+                                rrData.setLooping(false),
+                                rrData.killTurret(),
+                                rrData.getTrajectory(11),
+                                rrData.killTurret()
+
                         )
                 )
         );
@@ -440,9 +447,12 @@ public class AutoExtraAlignCorrect extends OpMode {
     @Override
     public void stop() {
 
-        rrData.setLooping(false);
+        if (rrData.getDrive() != null){
+            RoadRunnerDataV2.isAutoPosStored = true;
+            RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().localizer.getPose();
+        }
 
-        //RoadRunnerDataV2.lastAutoPosition = rrData.getDrive().getLocalizerPinpoint().getPose(); //Get last pos
+        rrData.setLooping(false);
 
         telemetry.addLine("Autonomous Completed!");
         telemetry.addData("Time Spent: ", RobotDataV2.getRuntime());

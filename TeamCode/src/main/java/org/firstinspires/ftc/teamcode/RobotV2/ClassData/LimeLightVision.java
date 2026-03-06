@@ -47,6 +47,7 @@ public class LimeLightVision {
     private String alliance;
     private Telemetry telemetry;
     private boolean activatedLocalizer;
+    private int excludedAllianceTag;
 
     /** Limelight Variables */
     private double lensHeight;
@@ -98,8 +99,15 @@ public class LimeLightVision {
         /** Alliance */
         this.alliance = alliance;
 
-        if (this.alliance.equals("blue")) limelight.pipelineSwitch(0);
-        else limelight.pipelineSwitch(1);
+        //21 is blue, 24 is red
+        if (this.alliance.equals("blue")){
+            excludedAllianceTag = 24;
+            limelight.pipelineSwitch(0);
+        }
+        else{
+            excludedAllianceTag = 21;
+            limelight.pipelineSwitch(0); //Used to Be 1
+        }
 
         /** Variable Init */
         this.atHeight = 0.756015; //approximation 0.756015
@@ -136,14 +144,18 @@ public class LimeLightVision {
     private double getTyDeg(){
         return getTy() * (Math.PI/180);
     }
+
+    private boolean isTargetGoalAprilTag(LLResultTypes.FiducialResult f){
+        return f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23 && f.getFiducialId() != excludedAllianceTag;
+    }
+
     public double getTyFidDeg(){
 
         if (getResults().isValid()){
             List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
 
             for (LLResultTypes.FiducialResult f : fiducials) {
-                if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
-                    //TODO Weird way out, pipline doesn't search for it anyways, so just check what's not id
+                if (isTargetGoalAprilTag(f)){
                     return f.getTargetYDegrees();
                 }
             }
@@ -156,7 +168,7 @@ public class LimeLightVision {
             List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
 
             for (LLResultTypes.FiducialResult f : fiducials) {
-                if (f.getFiducialId() != 21 && f.getFiducialId() != 22 && f.getFiducialId() != 23){
+                if (isTargetGoalAprilTag(f)){
                     return f.getTargetXDegreesNoCrosshair(); //+ f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES)
                     //f.getRobotPoseFieldSpace().getOrientation().getYaw()
                 }
@@ -165,6 +177,22 @@ public class LimeLightVision {
 
         return 0;
     }
+
+    public double getYawMetaAdjusted(){
+        if (canSeeSomeAT()){
+            List<LLResultTypes.FiducialResult> fiducials = getResults().getFiducialResults();
+
+            for (LLResultTypes.FiducialResult f : fiducials) {
+                if (isTargetGoalAprilTag(f)){
+                    return f.getTargetXDegreesNoCrosshair() + f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES); //+ f.getTargetPoseRobotSpace().getOrientation().getYaw(AngleUnit.DEGREES)
+                    //f.getRobotPoseFieldSpace().getOrientation().getYaw()
+                }
+            }
+        }
+
+        return 0;
+    }
+
     public double getDisp(){
         if (canSeeSomeAT()){
             return (levelLensAtHeight / Math.tan(Math.toRadians(getTyFidDeg()+10))) + RobotConstantsV2.LIMELIGHT_TURRET_DIFFERENCE; //Another triangle here upsidedown
@@ -180,6 +208,15 @@ public class LimeLightVision {
         limelight.updateRobotOrientation(yaw); //getYaw()
     }
     public void updateGlobalPosMetaTag(){
+        Pose3D pos = getResults().getBotpose();
+        RobotConstantsV2.LAST_ROBOT_POS = new Pose2d(39.37 * pos.getPosition().x,39.37 * pos.getPosition().y, pos.getOrientation().getYaw(AngleUnit.RADIANS));
+    }
+
+    public double getYawMT1(){
+        return getResults().getBotpose().getOrientation().getYaw(AngleUnit.DEGREES);
+    }
+
+    public void updateGlobalPosMetaTag2(){
         Pose3D pos = getResults().getBotpose_MT2();
         RobotConstantsV2.LAST_ROBOT_POS = new Pose2d(39.37 * pos.getPosition().x,39.37 * pos.getPosition().y, pos.getOrientation().getYaw(AngleUnit.RADIANS));
     }
@@ -264,11 +301,13 @@ public class LimeLightVision {
     }
     public void forceAllianceRed(){
         alliance = "red";
-        limelight.pipelineSwitch(1);
+        limelight.pipelineSwitch(0);
+        excludedAllianceTag = 21;
     }
     public void forceAllianceBlue(){
         alliance = "blue";
         limelight.pipelineSwitch(0);
+        excludedAllianceTag = 24;
     }
 
 }

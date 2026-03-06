@@ -33,9 +33,6 @@ public class DriverControlBlue extends OpMode {
         }
 
         RobotConstantsV2.CAROSEL_TOLERANCE = RobotConstantsV2.CAROSEL_TOLERANCE_TELE;
-        RobotConstantsV2.FAILSAFE_SUBMODE_TIMER = RobotConstantsV2.FAILSAFE_SUBMODE_TIMER_TELE; //0
-        RobotConstantsV2.COOLDOWN_SHOT = RobotConstantsV2.COOLDOWN_SHOT_TELE; //100
-        RobotConstantsV2.COOLDOWN_PRE_SHOT = RobotConstantsV2.COOLDOWN_PRE_SHOT_TELE; //0
 
         robotData = new RobotDataV2(hardwareMap, telemetry);
         rrData = new RoadRunnerDataV2(robotData);
@@ -43,10 +40,7 @@ public class DriverControlBlue extends OpMode {
         limelight = new LimeLightVision(hardwareMap,telemetry,"blue");
 
         /** Road Runner Init */
-        rrData.setBeginPoseFromAuto();
         rrData.createDrive();
-
-        RobotConstantsV2.CAROSEL_TOUCHPAD = 0;
 
         limelight.initLimeLight();
         robotData.getDriveTrain().setGamepad(gamepad1);
@@ -57,7 +51,7 @@ public class DriverControlBlue extends OpMode {
     @Override
     public void init_loop(){
 
-        if (!RoadRunnerDataV2.isAutoPosStored) rrData.updateGlobalRobotPosition(limelight);
+        if (!RoadRunnerDataV2.isAutoPosStored) rrData.updateGlobalRobotPosition(limelight, true);
 
         telemetry.addLine("Waiting for Round to Start");
 
@@ -80,7 +74,7 @@ public class DriverControlBlue extends OpMode {
         robotData.getCarosel().cycleOrigin();
 
         robotData.getTurret().switchTurretMode();
-        if (!RoadRunnerDataV2.isAutoPosStored) rrData.updateGlobalRobotPosition(limelight);
+        if (!RoadRunnerDataV2.isAutoPosStored) rrData.updateGlobalRobotPosition(limelight, true);
     }
 
     //Loops after Start
@@ -88,7 +82,11 @@ public class DriverControlBlue extends OpMode {
     public void loop(){
 
         //Loop Time
-        if (gamepad2.leftBumperWasPressed()){
+        if (gamepad2.leftBumperWasPressed() || gamepad1.dpad_left){
+            robotData.getTurret().telemetryDebug(rrData,limelight);
+        }
+
+        else if (gamepad1.dpad_right){
             testLoopTime.reset();
             loopCheck = true;
         }
@@ -107,10 +105,6 @@ public class DriverControlBlue extends OpMode {
                     robotData.getTurret().deactivateHumanIntakeMode();
 
                     //Switch Mode
-
-                    if (gamepad1.dpadDownWasPressed()){
-                        robotData.getTurret().switchAutoSetPos();
-                    }
 
                     //Passive Auto Aim
                     if (robotData.getTurret().isToggleTurretAim()){
@@ -131,7 +125,7 @@ public class DriverControlBlue extends OpMode {
                         robotData.getTurret().killShooter();
                     }
 
-                    if (gamepad1.dpadRightWasPressed()){
+                    if (gamepad1.rightStickButtonWasPressed()){
                         robotData.getDriveTrain().requestSortedFire();
                     }
 
@@ -142,19 +136,23 @@ public class DriverControlBlue extends OpMode {
 
                         //Auto cycling Not Active When the intake is on
                         if (robotData.getCarosel().isIntakeMotorOn()){
-                            robotData.getCarosel().autoIntakeCycle();
+                            if (!gamepad1.left_bumper) robotData.getCarosel().autoIntakeCycle();
                         }
                         else{
                             if (gamepad1.squareWasPressed()) robotData.getCarosel().cycleCaroselManual();
                         }
                     }
 
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.CLOSE_BALL_DISTANCE,limelight);
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),rrData.getDispTotality(limelight));
 
                     break;
 
                 //Manual
                 case("manual"):
+
+                    //Failsafe in Emergencies
+
+                    robotData.getDriveTrain().forceModeAuto();
 
                     //Direction
                     robotData.getTurret().deactivateHumanIntakeMode();
@@ -174,17 +172,12 @@ public class DriverControlBlue extends OpMode {
 
                     //Cycling (Don't want cycling during submodes)
                     if (robotData.getDriveTrain().getCurrentSubMode().equals("none")){
-//                        if (gamepad1.touchpad){
-//                            RobotConstantsV2.CAROSEL_TOUCHPAD = (int)(gamepad1.touchpad_finger_1_x * RobotConstantsV2.caroselMultiplier);
-//                            robotData.getCarosel().cycleCarosel(robotData.getCarosel().getCurrentCycle());
-//                        }
-
                         if (gamepad1.squareWasPressed()){
                             robotData.getCarosel().cycleCaroselManual();
                         }
                     }
 
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),RobotConstantsV2.FAR_BALL_DISTANCE,limelight);
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0);
 
                     break;
 
@@ -206,7 +199,7 @@ public class DriverControlBlue extends OpMode {
                             //robotData.getCarosel().cycleCaroselManual();
                         }
                     }
-                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0, limelight);
+                    robotData.getCarosel().updateIndicators(robotData.getDriveTrain().getCurrentMode(),0);
 
                     break;
 
@@ -214,8 +207,6 @@ public class DriverControlBlue extends OpMode {
                     telemetry.addLine("Richie is Bald");
                     break;
             }
-
-        robotData.getCarosel().receiveAutoCycleStatus();
 
         //-----------------------------------------------------
 
@@ -233,7 +224,8 @@ public class DriverControlBlue extends OpMode {
 
         /** Mode Switching */
         if (gamepad1.shareWasPressed()){
-            robotData.getDriveTrain().switchMode();
+            //robotData.getDriveTrain().switchMode();
+            robotData.getTurret().switchAutoSetPos();
         }
 
         else if (gamepad1.dpadUpWasPressed() && robotData.getDriveTrain().getCurrentSubMode().equals("none")){
@@ -241,7 +233,7 @@ public class DriverControlBlue extends OpMode {
         }
 
         //Rapid Fire
-        if (gamepad1.dpadLeftWasPressed()){
+        if (gamepad1.leftStickButtonWasPressed()){
             robotData.getDriveTrain().requestRapidFire();
         }
 
@@ -250,28 +242,38 @@ public class DriverControlBlue extends OpMode {
         //Toggle Auto Aim
         if (gamepad1.left_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
             robotData.getDriveTrain().forceRobotCentricOff();
+            robotData.getTurret().updateNormX(rrData);
         }
 
         else{
             robotData.getDriveTrain().forceRobotCentricOn();
+            robotData.getTurret().forceZeroVX0();
         }
 
-        //Auto Align Request
-//        else if (gamepad1.left_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
-//            rrData.requestAlign(rrData.getYawTotality(limelight));
-//            rrData.runCurrentTeleOpAction();
-//        }
+        if (gamepad1.dpad_down){
+            rrData.updateGlobalRobotPosition(limelight,false);
+            //rrData.requestAlign(limelight);
+            rrData.requestGateIntake(limelight.getAlliance());
+            rrData.runCurrentTeleOpAction();
+        }
 
-        //Auto Park Request
-         if (gamepad1.right_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
+        else if (gamepad1.right_trigger > RobotConstantsV2.TRIGGER_TOLERENCE){
+            rrData.updateGlobalRobotPosition(limelight,false);
             rrData.requestPark(limelight.getAlliance());
             rrData.runCurrentTeleOpAction();
         }
 
         //Reset Action Progress
         else{
+
+            rrData.updateGlobalRobotPosition(limelight,true);
+            //To Happen After Stop Holding One of the Trajectory Buttons
+            if (rrData.isTeleOpActionActive()){
+                robotData.getCarosel().forceIntakeOff();
+            }
+
             rrData.setTeleOpActionActive(false);
-            robotData.getDriveTrain().omniDrive(rrData,limelight);
+            robotData.getDriveTrain().omniDrive(rrData,limelight.getAlliance());
         }
 
         /** Sub Modes */
@@ -300,10 +302,12 @@ public class DriverControlBlue extends OpMode {
         robotData.getDriveTrain().executeSubMode();
         robotData.getCarosel().transferReceiveTimer();
 
-        if (gamepad1.leftBumperWasPressed()){
+        if (gamepad1.touchpadWasPressed()){
             LimeLightVision.isFoundMotif = false;
             robotData.getDriveTrain().endSubMode();
             robotData.getCarosel().wipeInventory();
+            robotData.getCarosel().cycleCaroselManual();
+            robotData.getCarosel().cycleCaroselManual();
         }
 
         //-----------------------------------------------------
@@ -313,6 +317,7 @@ public class DriverControlBlue extends OpMode {
         //Vision
         if (limelight.canSeeSomeAT()){
             telemetry.addLine("Eyes Open");
+            //robotData.getTurret().telemetryDebug(limelight.getDisp(), rrData, limelight);
         }
         else{
             telemetry.addLine("Eyes Closed");
@@ -324,8 +329,7 @@ public class DriverControlBlue extends OpMode {
             limelight.updateMotifCode();
         }
 
-        limelight.updateOrientationIMU(rrData.getYaw());
-        rrData.updateGlobalRobotPosition(limelight);
+        //rrData.updateGlobalRobotPosition(limelight, true);
 
         /** Data */
         robotData.getDriveTrain().telemetryDriveTrain();

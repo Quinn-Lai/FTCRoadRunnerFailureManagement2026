@@ -34,16 +34,13 @@ public class MeepMeepTest {
         Pose2d spawn = new Pose2d(-49.5, -50, Math.toRadians(144.046));
         Pose2d shootingPos = new Pose2d(-15, -15, Math.toRadians(225));
 
-        Pose2d lineBot = new Pose2d(33, -28, Math.toRadians(270));
-        Pose2d lineBotCollect = new Pose2d(33, -45, Math.toRadians(270));
-        Pose2d lineMid = new Pose2d(11, -28, Math.toRadians(270));
-        Pose2d lineMidCollect = new Pose2d(11, -45, Math.toRadians(270));
-        Pose2d lineTop = new Pose2d(-12, -28, Math.toRadians(270));
-        Pose2d lineTopCollect = new Pose2d(-12, -45, Math.toRadians(270));
-
-        Pose2d collectFromGateClose = new Pose2d(0,0,0);
-        Pose2d collectFromGateFar = new Pose2d(0,0,0);
-        Pose2d gate = new Pose2d(11, -48, Math.toRadians(270));
+        Pose2d lineBot = new Pose2d(38, -24, Math.toRadians(270));;
+        Pose2d lineBotCollect =  new Pose2d(38, -47 - 12, Math.toRadians(270));
+        Pose2d lineMid = new Pose2d(15, -24, Math.toRadians(270));
+        Pose2d lineMidCollect = new Pose2d(15, -47 - 12, Math.toRadians(270));
+        Pose2d lineTop = new Pose2d(-9, -24, Math.toRadians(270));
+        Pose2d lineTopCollect =  new Pose2d(-9, -49, Math.toRadians(270));
+        Pose2d gate = new Pose2d(11, -52, Math.toRadians(270));
 
 
         RoadRunnerBotEntity myBot = new DefaultBotBuilder(meepMeep)
@@ -53,35 +50,37 @@ public class MeepMeepTest {
                 .build();
 
         Action closeSideRed = myBot.getDrive().actionBuilder(spawn)
-                .setTangent(Math.toRadians(315))
-                .splineToLinearHeading(shootingPos,Math.toRadians(315))
-
                 .setTangent(Math.toRadians(45))
-                .splineToLinearHeading(lineTop, Math.toRadians(90))
-
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineTopCollect,Math.toRadians(90))
-
-                .setTangent(Math.toRadians(270))
-                .splineToLinearHeading(shootingPos,Math.toRadians(270))
-
-                .setTangent(Math.toRadians(270))
-                .splineToLinearHeading(gate, Math.toRadians(270))
-                .turn(Math.toRadians(30))
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineMid, Math.toRadians(90))
-
-                .setTangent(Math.toRadians(270))
-                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+                .splineToLinearHeading(shootingPos,Math.toRadians(45))
 
                 .setTangent(Math.toRadians(0))
-                .splineToLinearHeading(lineBot, Math.toRadians(90))
+                .splineToSplineHeading(lineTop, Math.toRadians(270), new TranslationalVelConstraint(100))
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(lineTopCollect,Math.toRadians(270), new TranslationalVelConstraint(10))
 
-                .setTangent(Math.toRadians(90))
-                .splineToLinearHeading(lineBotCollect,Math.toRadians(90))
+                .splineToLinearHeading( new Pose2d(0, -52, Math.toRadians(270)), Math.toRadians(90), new TranslationalVelConstraint(200))
 
-                .setTangent(Math.toRadians(225))
-                .splineToLinearHeading(new Pose2d(-20, -15, Math.toRadians(230)),Math.toRadians(225))
+//
+//                .setTangent(Math.toRadians(270))
+//                .splineToLinearHeading(shootingPos,Math.toRadians(270))
+//
+//                .setTangent(Math.toRadians(270))
+//                .splineToLinearHeading(gate, Math.toRadians(270))
+//                .turn(Math.toRadians(30))
+//                .setTangent(Math.toRadians(90))
+//                .splineToLinearHeading(lineMid, Math.toRadians(90))
+//
+//                .setTangent(Math.toRadians(270))
+//                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+//
+//                .setTangent(Math.toRadians(0))
+//                .splineToSplineHeading(lineBot, Math.toRadians(90), new TranslationalVelConstraint(100))
+//
+//                .setTangent(Math.toRadians(90))
+//                .splineToLinearHeading(lineBotCollect,Math.toRadians(90), new TranslationalVelConstraint(10))
+//
+//                .setTangent(Math.toRadians(225))
+//                .splineToLinearHeading(new Pose2d(-20, -15, Math.toRadians(230)),Math.toRadians(225))
 
                 .build();
 
@@ -94,13 +93,127 @@ public class MeepMeepTest {
 
                 .build();
 
+
         Action park = myBot.getDrive().actionBuilder(new Pose2d(9,55,Math.toRadians(115)))
                 //.splineToLinearHeading(gateBlue,0)
 
                 .turn(1)
                 .build();
 
-        myBot.runAction(park);
+        Action spamGate = myBot.getDrive().actionBuilder(new Pose2d(-52, -48.5, Math.toRadians(54.046)))
+
+                .setTangent(Math.toRadians(30))
+                .splineToLinearHeading(shootingPos,Math.toRadians(30))
+
+                .setTangent(Math.toRadians(315))
+                .splineToLinearHeading(lineTop, Math.toRadians(270))
+
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(lineTopCollect,Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(90))
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(lineMid, Math.toRadians(270))
+
+                .setTangent(Math.toRadians(270))
+                .splineToLinearHeading(lineMidCollect,Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(new Pose2d(9,-55, Math.toRadians(245)),Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(new Pose2d(9,-55, Math.toRadians(245)),Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(new Pose2d(9,-55, Math.toRadians(245)),Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(shootingPos,Math.toRadians(180))
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(new Pose2d(9,-55, Math.toRadians(245)),Math.toRadians(270))
+
+                .setTangent(Math.toRadians(90))
+                .splineToLinearHeading(new Pose2d(-30, -15, Math.toRadians(238)),Math.toRadians(180))
+
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(new Pose2d(3, -43, Math.toRadians(0)),Math.toRadians(270))
+
+                .build();
+
+        Pose2d corner = new Pose2d(60, 60, Math.toRadians(90));
+        Pose2d midCorner = new Pose2d(60, 40, Math.toRadians(90));
+
+        Action cornerFar = myBot.getDrive().actionBuilder(new Pose2d(61.065, 13, Math.toRadians(180)))
+
+                .setTangent(Math.toRadians(180))
+                .splineToLinearHeading(new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(180))
+
+//                .setTangent(Math.toRadians(180))
+//                .splineToLinearHeading(midCorner,Math.toRadians(90))
+                .turn(Math.toRadians(-45))
+                .setTangent(Math.toRadians(0))
+                .splineToLinearHeading(corner,Math.toRadians(90))
+
+                .setTangent(Math.toRadians(225))
+                .splineToLinearHeading(new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(315))
+
+                .setTangent(Math.toRadians(135))
+                .lineToX(20)
+
+                .build();
+
+        Action cornerFarMK2 = myBot.getDrive().actionBuilder(new Pose2d(61.065, 13, Math.toRadians(180)))
+
+                .setTangent(Math.toRadians(180))
+                .splineToLinearHeading(new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(180))
+
+                .setTangent(Math.toRadians(180))
+                .splineToLinearHeading(new Pose2d(57,57,Math.toRadians(45)),Math.toRadians(90))
+
+                .setTangent(Math.toRadians(225))
+                .splineToLinearHeading(new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(315))
+
+                .setTangent(Math.toRadians(135))
+                .lineToX(20)
+
+                .build();
+
+        Action cornerFarMK3 = myBot.getDrive().actionBuilder(new Pose2d(61.065, 13, Math.toRadians(180)))
+
+                .setTangent(Math.toRadians(180))
+                .splineToLinearHeading( new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(180))
+
+                //.turn(Math.toRadians(-30))
+                .setTangent(Math.toRadians(90))
+                .splineToSplineHeading(new Pose2d(70, 60, Math.toRadians(90)),Math.toRadians(90))
+                .setTangent(Math.toRadians(180))
+                .splineToSplineHeading(new Pose2d(55, 60, Math.toRadians(90)),Math.toRadians(135))
+                .setTangent(Math.toRadians(0))
+                .splineToSplineHeading(new Pose2d(70, 60, Math.toRadians(90)),Math.toRadians(45))
+
+                .setTangent(Math.toRadians(225))
+                .splineToLinearHeading( new Pose2d(51, 13, Math.toRadians(157)),Math.toRadians(315))
+
+                .setTangent(Math.toRadians(180))
+                .lineToX(40)
+
+                .build();
+
+
+        myBot.runAction(cornerFarMK3);
 
         meepMeep.setBackground(MeepMeep.Background.FIELD_DECODE_OFFICIAL)
                 .setDarkMode(true)

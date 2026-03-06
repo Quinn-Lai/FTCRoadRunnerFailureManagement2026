@@ -7,6 +7,8 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.InstantAction;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
+import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -46,9 +48,14 @@ public class RoadRunnerDataV2{
     private Action currentTeleOpAction;
     private boolean teleOpActionActive;
     private boolean isCaseOhActive;
+    private boolean flagIntake;
 
     //----------------------------------------
     public RoadRunnerDataV2(RobotDataV2 robot){
+
+        drive = null;
+        RobotConstantsV2.AUTO_FAILSAFE_TIMER = RobotConstantsV2.AUTO_FAILSAFE_TIMER_CLOSE;
+
         this.robotData = robot;
         loopingActive = false;
         isDoneInit = false;
@@ -57,10 +64,11 @@ public class RoadRunnerDataV2{
 
         teleOpActions = new ArrayList<>();
         trajectoryBuilt = new ArrayList<Action>();
-        beginPose = null;
+        beginPose = new Pose2d(0,0,0);
 
         failsafeTimer = new ElapsedTime();
 
+        flagIntake = false;
         currentTeleOpAction = null;
         displacement = 0;
         intendedHeading = 0;
@@ -70,6 +78,10 @@ public class RoadRunnerDataV2{
     }
 
     //----------------------------------------
+
+    public boolean getFlagIntake(){
+        return flagIntake;
+    }
 
     /** Localization */
     public Pose2d getBeginPose() {
@@ -100,6 +112,20 @@ public class RoadRunnerDataV2{
         return dash;
     }
 
+    //Sub this in for vx0 in physics calc
+    public double getNetVelocity(){
+        return Math.sqrt(Math.pow(getVelocityY(),2) + Math.pow(getVelocityX(),2));
+    }
+    public double getVelocityX(){
+        return drive.localizer.update().linearVel.x * 0.0254;
+    }
+
+    public double getVelocityY(){
+
+        //double error = getYawLocalizationOld(alliance) - getYaw360();
+        return drive.localizer.update().linearVel.y * 0.0254; //* Math.cos(error);
+    }
+
     //Global Yaw
     public double getYaw(){
         //return drive.getLocalizerPinpoint().getHeadingLocalizerDegrees();
@@ -116,13 +142,66 @@ public class RoadRunnerDataV2{
     public double getDispLocalization(String alliance) {
 
         if (alliance.equals("blue")) {
-            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, 2)));
+            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_AIM_BLUE[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_AIM_BLUE[1] - drive.localizer.getPose().position.y, 2)));
         }
         else {
-            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_RED[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_POS_RED[1] - drive.localizer.getPose().position.y, 2)));
+            return 0.0254 * (Math.sqrt(Math.pow(RobotConstantsV2.GLOBAL_GOAL_AIM_RED[0] - drive.localizer.getPose().position.x, 2) +  Math.pow(RobotConstantsV2.GLOBAL_GOAL_AIM_RED[1] - drive.localizer.getPose().position.y, 2)));
         }
     }
-    public double getYawLocalization(String alliance){
+
+    public double getRobotTheta(){
+        double degrees = Math.toDegrees(Math.atan2(getVelocityY(),getVelocityX()));
+
+        if (degrees < 0) degrees += 360;
+
+        return degrees;
+    }
+
+    //TODO: HAHAHHA Im SO SMart, polar coordinates go burr (calc bc for life hahaiuehfuikahse)
+    public double getNormXVel(){
+        return getNetVelocity() * Math.cos(Math.toRadians(getYaw360()));
+    }
+
+    public double getNormYVel(){
+        return  getNetVelocity() * Math.sin(Math.toRadians(getYaw360()));
+    }
+
+    public Double[] getVelTowerSurface(String alliance){
+
+        double theta;
+        if (alliance.equals("blue")){
+            theta = 50;
+        }
+        else{
+            theta = 140;
+        }
+
+        double vel = 0;
+        double thetaDiff = 0;
+
+        if (getRobotTheta() >= theta){
+            thetaDiff = getRobotTheta() - theta;
+            vel = getNormXVel() * Math.cos(Math.toRadians(thetaDiff));
+
+        }
+
+        else{
+            vel = getNormYVel() * Math.sin(Math.toRadians(getRobotTheta()));
+        }
+
+        return new Double[]{vel * Math.cos(Math.toRadians(theta)), vel * Math.sin(Math.toRadians(theta))};
+
+    }
+
+    public double getMovementTowerCoordsX(String alliance, double timeExtrema){
+        return RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] + getVelTowerSurface(alliance)[0] * timeExtrema;
+    }
+
+    public double getMovementTowerCoordsY(String alliance, double timeExtrema){
+        return RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] + getVelTowerSurface(alliance)[1] * timeExtrema; //TODO Times by time extrema value
+    }
+
+    public double getYawLocalization(String alliance, double time){
         double heading;
 
         if (alliance.equals("blue")) {
@@ -134,7 +213,6 @@ public class RoadRunnerDataV2{
 //            robotData.getTelemetry().addData("Y Goal: ", RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] );
 //
 //            robotData.getTelemetry().addData("Pos: ", Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x)));
-
             heading = Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x));
         }
         else {
@@ -145,9 +223,48 @@ public class RoadRunnerDataV2{
 
         return heading;
     }
-    public void updateGlobalRobotPosition(LimeLightVision limelight){
 
-        if (limelight.canSeeSomeAT()){
+    public double getYawLocalizationOld(String alliance, double timeExtrema){
+        double heading;
+
+        if (alliance.equals("blue")) {
+
+//            robotData.getTelemetry().addData("X: ",  drive.localizer.getPose().position.x);
+//            robotData.getTelemetry().addData("Y: ",  drive.localizer.getPose().position.y);
+//
+//            robotData.getTelemetry().addData("X Goal: ", RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] );
+//            robotData.getTelemetry().addData("Y Goal: ", RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] );
+//
+//            robotData.getTelemetry().addData("Pos: ", Math.toDegrees(Math.atan2(RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[1] - drive.localizer.getPose().position.y, RobotConstantsV2.GLOBAL_GOAL_POS_BLUE[0] - drive.localizer.getPose().position.x)));
+            heading = Math.toDegrees(Math.atan2(getMovementTowerCoordsY(alliance, timeExtrema) - drive.localizer.getPose().position.y, getMovementTowerCoordsX(alliance, timeExtrema) - drive.localizer.getPose().position.x));
+        }
+        else {
+            heading = Math.toDegrees(Math.atan2(getMovementTowerCoordsY(alliance, timeExtrema) - drive.localizer.getPose().position.y, getMovementTowerCoordsX(alliance, timeExtrema) - drive.localizer.getPose().position.x));
+        }
+
+        if (heading < 0) heading += 360;
+
+        return heading;
+    }
+    public void updateGlobalRobotPosition(LimeLightVision limelight, boolean localOn){
+
+        //drive.updatePoseEstimate();
+        //double yaw = getYaw();
+
+//        if (limelight.canSeeSomeAT() && localOn){
+////            limelight.updateGlobalPosMetaTag();
+////            Pose2d pose = RobotConstantsV2.LAST_ROBOT_POS;
+////            TelemetryPacket packet = new TelemetryPacket();
+////            packet.fieldOverlay().setStroke("#3F51B5");
+////            Drawing.drawRobot(packet.fieldOverlay(), pose);
+////            FtcDashboard.getInstance().sendTelemetryPacket(packet);
+////            updateDrivePos(pose);
+//            yaw = limelight.getYawMT1();
+//        }
+
+        if (limelight.canSeeSomeAT() && localOn){
+
+            //limelight.updateOrientationIMU(yaw1);
             limelight.updateGlobalPosMetaTag();
             Pose2d pose = RobotConstantsV2.LAST_ROBOT_POS;
             TelemetryPacket packet = new TelemetryPacket();
@@ -155,7 +272,7 @@ public class RoadRunnerDataV2{
             Drawing.drawRobot(packet.fieldOverlay(), pose);
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
             updateDrivePos(pose);
-            drive.updatePoseEstimate();
+            //drive.updatePoseEstimate();
         }
         else{
             Pose2d pose = drive.localizer.getPose();
@@ -171,7 +288,7 @@ public class RoadRunnerDataV2{
     //Totality
     public double getYawTotality(LimeLightVision limelight){
         if (limelight.canSeeSomeAT()) return limelight.getFidYaw();
-        else return getYawLocalization(limelight.getAlliance());
+        else return getYawLocalization(limelight.getAlliance(),0);
     }
     public double getDispTotality(LimeLightVision limelight){
         if (limelight.canSeeSomeAT()) return limelight.getDisp();
@@ -257,46 +374,66 @@ public class RoadRunnerDataV2{
 
 
     /** Trajectories */
+    public int getTangentThreshold(double threshold){
+
+        //Top
+        if (drive.localizer.getPose().position.x < threshold){
+            return (int) Math.toRadians(0);
+        }
+
+        //Bottom
+        else{
+            return (int) Math.toRadians(180);
+        }
+
+    }
     public Action getParkingTrajectory(String alliance){
 
         Action park;
-
-//        if (alliance.equals("blue")){
-//
-//            park = getDrive().actionBuilder(RobotConstantsV2.blueCorner)
-//                    .setTangent(Math.toRadians(225))
-//                    .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
-//                    .build();
-//        }
-//        else{
-//            park = getDrive().actionBuilder(RobotConstantsV2.redCorner)
-//                    .setTangent(Math.toRadians(135))
-//                    .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
-//                    .build();
-//        }
 
         if (alliance.equals("blue")){
 
             park = getDrive().actionBuilder(drive.localizer.getPose())
                     //TODO Add Tangent Direction of path
+                    .setTangent(Math.toRadians(getTangentThreshold(RobotConstantsV2.parkingBlue.position.x))) //0
                     .splineToLinearHeading(RobotConstantsV2.parkingBlue,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
                     .build();
         }
         else{
             park = getDrive().actionBuilder(drive.localizer.getPose())
+                    .setTangent(Math.toRadians(getTangentThreshold(RobotConstantsV2.parkingRed.position.x)))
                     .splineToLinearHeading(RobotConstantsV2.parkingRed,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED))
                     .build();
         }
 
         return park;
     }
-    public Action getAlignTrajectory(double limelightYaw){
+    public Action getAlignTrajectory(LimeLightVision limelight){
 
-        if (limelightYaw == 0) return new InstantAction( () -> doNothing());
+        Action align;
+        double limelightYaw;
 
-        Action align = getDrive().actionBuilder(drive.localizer.getPose())
-                .turn(Math.toRadians(-limelightYaw))
-                .build();
+        if (limelight.canSeeSomeAT()){
+
+            limelightYaw = limelight.getYawMetaAdjusted();
+
+            if (limelightYaw == 0) return new InstantAction( () -> doNothing());
+
+            align = getDrive().actionBuilder(drive.localizer.getPose())
+                    .turn(Math.toRadians(-limelightYaw))
+                    .build();
+        }
+        else{
+
+            limelightYaw = getYawLocalization(limelight.getAlliance(),0);
+            double currentYaw = getYaw360();
+
+            double targetYaw = limelightYaw - currentYaw;
+
+            align = getDrive().actionBuilder(drive.localizer.getPose())
+                    .turn(Math.toRadians(-targetYaw))
+                    .build();
+        }
 
         return align;
 
@@ -321,6 +458,28 @@ public class RoadRunnerDataV2{
         return caseOh;
 
     }
+    public Action getGateIntakeTrajectory(String alliance){
+
+        Action gate;
+
+        if (alliance.equals("blue")){
+
+            gate = getDrive().actionBuilder(drive.localizer.getPose())
+                    //TODO Add Tangent Direction of path
+                    .setTangent(Math.toRadians(getTangentThreshold(RobotConstantsV2.GATE_INTAKE_BLUE.position.x))) //270
+                    .splineToLinearHeading(RobotConstantsV2.GATE_INTAKE_BLUE,Math.toRadians(270), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
+                    .build();
+        }
+        else{
+            gate = getDrive().actionBuilder(drive.localizer.getPose())
+                    .setTangent(Math.toRadians(getTangentThreshold(RobotConstantsV2.GATE_INTAKE_RED.position.x))) //90
+                    .splineToLinearHeading(RobotConstantsV2.GATE_INTAKE_RED,Math.toRadians(90), new TranslationalVelConstraint(RobotConstantsV2.PARKING_SPEED), new ProfileAccelConstraint(RobotConstantsV2.MIN_ACCEL_SPEED,RobotConstantsV2.MAX_ACCEL_SPEED))
+                    .build();
+        }
+
+        return gate;
+    }
+
     public boolean isCaseOhActive(){
         return isCaseOhActive;
     }
@@ -344,34 +503,38 @@ public class RoadRunnerDataV2{
 
     /** Trajectories Request*/
     public void requestPark(String alliance){
-
-        robotData.getDriveTrain().killAllWheels();
-
         if (!teleOpActionActive){
+            robotData.getDriveTrain().killAllWheels();
             teleOpActionActive = true;
             killTeleOpActions();
             addTeleopAction(getParkingTrajectory(alliance));
         }
     }
-    public void requestAlign(double yaw){
-
-        robotData.getDriveTrain().killAllWheels();
+    public void requestAlign(LimeLightVision limelight){
 
         if (!teleOpActionActive){
+            robotData.getDriveTrain().killAllWheels();
             teleOpActionActive = true;
             killTeleOpActions();
-            addTeleopAction(getAlignTrajectory(yaw));
-
+            addTeleopAction(getAlignTrajectory(limelight));
         }
     }
     public void requestCaseOhStall(){
 
-        robotData.getDriveTrain().killAllWheels();
-
         if (!teleOpActionActive){
+            robotData.getDriveTrain().killAllWheels();
             teleOpActionActive = true;
             killTeleOpActions();
             addTeleopAction(getCaseOhStall());
+        }
+    }
+    public void requestGateIntake(String alliance){
+        if (!teleOpActionActive){
+            robotData.getDriveTrain().killAllWheels();
+            robotData.getCarosel().forceIntakeOn();
+            teleOpActionActive = true;
+            killTeleOpActions();
+            addTeleopAction(getGateIntakeTrajectory(alliance));
         }
     }
 
@@ -431,6 +594,15 @@ public class RoadRunnerDataV2{
 
 
     /** Quick Actions */
+
+    public Action setDisplacementQuick(double disp){
+        return new InstantAction( () -> setDisplacement(disp));
+    }
+
+    public Action updateLastPosition(){
+        RoadRunnerDataV2.isAutoPosStored = true;
+        return new InstantAction( () -> RoadRunnerDataV2.lastAutoPosition = getDrive().localizer.getPose()); //Get last pos)
+    }
     public Action intakeReverse(){
         return new InstantAction (() -> robotData.getCarosel().forceReverseIntakeOn());
     }
@@ -442,9 +614,6 @@ public class RoadRunnerDataV2{
     }
     public Action intakeOff() {
         return new InstantAction(() -> robotData.getCarosel().forceIntakeOff());
-    }
-    public Action quickUpdateInventory(){
-        return new InstantAction(()->robotData.getCarosel().updateInventory());
     }
     public Action startFailsafeTimer() {
         return new InstantAction(() -> failsafeTimer.reset());
@@ -505,21 +674,6 @@ public class RoadRunnerDataV2{
     }
 
     /** Complex Actions */
-    public class UpdateInventory implements Action{
-
-        @Override
-        public boolean run(@NonNull TelemetryPacket packet) {
-
-            robotData.getCarosel().updateInventory();
-
-            return loopingActive;
-
-        }
-
-    }
-    public Action updateInveentory(){
-        return new UpdateInventory();
-    }
     public class UpdateCaroselEncdoer implements Action{
 
         @Override
@@ -540,25 +694,39 @@ public class RoadRunnerDataV2{
         public boolean run(@NonNull TelemetryPacket packet) {
 
             robotData.getCarosel().autoIntakeCycle();
-            robotData.getCarosel().receiveAutoCycleStatus();
-
-            //robotData.getCarosel().isAutoIntakeCooldownActive()
 
             if (failsafeTimer.milliseconds() > RobotConstantsV2.AUTO_FAILSAFE_TIMER){
+                flagIntake = true;
                 return false;
             }
 
-             //&& failsafeTimer.milliseconds() < RobotConstantsV2.AUTO_FAILSAFE_TIMER
-            return (robotData.getCarosel().isEmptySpot() || robotData.getCarosel().isAutoIntakeCooldownActive());
+            flagIntake = false;
+            return (robotData.getCarosel().isEmptySpot());
         }
     }
     public Action checkAutoIntake() {
         return new CheckAutoIntake();
     }
+
+    public SequentialAction flagException(SequentialAction action){
+
+        if (flagIntake) return new SequentialAction();
+
+        return action;
+    }
+
+    public SequentialAction flagExceptionProc(SequentialAction action){
+
+        if (flagIntake) return action;
+
+        return new SequentialAction();
+    }
+
     public class RequestPatternFire implements Action{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
 
+            robotData.getDriveTrain().setCurrentSubMode(RobotConstantsV2.subModes[1]);
             robotData.getCarosel().activatePatternInProg();
             robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
             robotData.getCarosel().setMaxShotsPattern();
@@ -711,6 +879,7 @@ public class RoadRunnerDataV2{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
 
+            robotData.getDriveTrain().setCurrentSubMode(RobotConstantsV2.subModes[0]);
             robotData.getCarosel().activateCycleInProg();
             robotData.getCarosel().setSubModeQueue(RobotConstantsV2.subModeStages[0]);
 
@@ -812,6 +981,8 @@ public class RoadRunnerDataV2{
             robotData.getTelemetry().addData("Starting Side", getRobotData().getStartingSide());
             robotData.getTelemetry().addData("Starting Position", getRobotData().getStartingPosition());
             robotData.getTelemetry().addData("Starting Color: ", limeLightVision.getAlliance());
+            robotData.getTelemetry().addData("In Place: ", robotData.getCarosel().isCaroselInPlace());
+            robotData.getTelemetry().addData("In Place Intake: ", robotData.getCarosel().isCaroselInPlaceIntake());
 
             robotData.getCarosel().telemetryCarosel();
             robotData.getTelemetry().update();
@@ -833,7 +1004,7 @@ public class RoadRunnerDataV2{
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
 
-            getRobotData().getCarosel().updateIndicators("manual",displacement,limeLight);
+            getRobotData().getCarosel().updateIndicators("manual",0);
             return loopingActive;
         }
     }
@@ -859,6 +1030,10 @@ public class RoadRunnerDataV2{
     public Action waitForTurret(boolean active) {
         return new WaitForTurret(active);
     }
+    public TrajectoryActionBuilder instantPath(Pose2d spawn) {
+        return getDrive().actionBuilder(spawn);
+    }
+
     public class CyclePattern implements Action{ //Creates Class, so each class is represented as an Action
 
         private int num;
